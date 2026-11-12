@@ -1,0 +1,6 @@
+{
+  "native_libraries": {
+    "libdevice.so": ["arm64-v8a", "x86_64"]
+  },
+  "required_entries": ["proguard.txt"]
+}
