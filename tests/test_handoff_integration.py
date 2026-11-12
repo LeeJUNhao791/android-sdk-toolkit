@@ -11,6 +11,7 @@ from zipfile import ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 AAR_CHECK = ROOT / "skills/aar-delivery-check/scripts/check_aar.py"
 CONTRACT = ROOT / "skills/aar-delivery-check/examples/expect.json"
+APK_CHECK = ROOT / "skills/apk-page-size-check/scripts/check_apk.py"
 PUBLISH = ROOT / "skills/android-sdk-pack/scripts/publish_sdk.py"
 GROUP = "io.github.leejunhao791.sdktoolkit"
 AAR_COORDINATE = f"{GROUP}:device-sdk:0.1.0"
@@ -40,6 +41,17 @@ class HandoffIntegration(unittest.TestCase):
         )
         report = json.loads(handoff.stdout)
         self.assertTrue(report["consumer_artifact_verified"])
+        apk = ROOT / "examples/consumers/android/build/outputs/apk/debug/aar-consumer-debug.apk"
+        alignment = json.loads(self.run_tool(APK_CHECK, apk).stdout)
+        self.assertEqual(alignment["status"], "pass")
+        self.assertEqual(
+            {(item["entry"], item["elf"], item["zip"]) for item in alignment["libraries"]},
+            {
+                ("lib/arm64-v8a/libdevice.so", "pass", "pass"),
+                ("lib/x86_64/libdevice.so", "pass", "pass"),
+            },
+        )
+
         wrapper_name = "gradlew.bat" if sys.platform == "win32" else "gradlew"
         wrapper = ROOT / "examples/android-sdk" / wrapper_name
         consumer = ROOT / "examples/consumers/android"
