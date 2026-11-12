@@ -51,5 +51,9 @@ jobs:
       - name: Install the Android build tools used by the example
         run: |
           "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
-      - name: Check real AAR and JAR handoffs and build the JNI test APK
+      - name: Check real handoffs and final APK alignment, and build the JNI test APK
         run: python -B -m unittest discover -s tests -v
+
+      - name: Verify APK ZIP alignment with Android Build Tools
+        run: |
+          "${ANDROID_HOME}/build-tools/35.0.0/zipalign" -v -c -P 16 4 examples/consumers/android/build/outputs/apk/debug/aar-consumer-debug.apk

@@ -102,6 +102,33 @@ for the checker.
 Run the diagnosis tests with
 `python -B -m unittest discover -s skills/android-jni-doctor/tests -v`.
 
+## Check 16 KB alignment in a final APK
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py app.apk
+```
+
+The checker uses Python 3.8 or newer and the standard library. It inspects
+`lib/<abi>/*.so` entries in the supplied APK:
+
+- For ARM64 and x86-64 libraries, every ELF `PT_LOAD` segment must declare a
+  power-of-two alignment of at least 16 KB. Its file offset and virtual
+  address must be congruent modulo that alignment.
+- For uncompressed libraries in the four supported Android ABIs, the ZIP
+  entry's data must start at a 16 KB boundary. Compressed 64-bit libraries
+  still get the ELF check.
+
+The JSON report lists the affected paths, LOAD program headers and ZIP data
+offsets. Exit 0 means the scoped alignment checks passed, 1 means an alignment
+failure, 2 means invalid or unsupported input, and 3 means there were no
+64-bit libraries and no ZIP alignment failures. A single APK report covers
+that file. For a split delivery, check each distributed APK.
+
+A pass is static alignment evidence. GNU_RELRO layout and APK installation and
+JNI execution on a 16 KB Android system require separate checks. See
+[Android's 16 KB page size guide](https://developer.android.com/guide/practices/page-sizes)
+and the [runtime procedure below](#verify-the-aar-on-an-android-device).
+
 ## Package and verify an SDK handoff
 
 Publish a Gradle AAR or JAR into a fresh local Maven repository, then check
@@ -182,7 +209,10 @@ Runtime checks on an ARM64 device with 16 KB pages and on Android 6.0
 Windows and Linux. The Linux integration job builds the JNI test APK and
 checks the real AAR and JAR examples. It rejects an x86-64 library in the ARM64
 AAR path and verifies that the selected consumer module and variant resolve
-the published SDK bytes at the requested coordinate.
+the published SDK bytes at the requested coordinate. It runs the 16 KB
+alignment preflight and Android Build Tools' `zipalign` on the real Android
+consumer APK. The Python tests also use generated APKs to isolate ELF and ZIP
+alignment failures.
 
 With JDK 17 and the Android tools listed above, run the integration tests
 locally from the repository root:
