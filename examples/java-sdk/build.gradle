@@ -1,0 +1,27 @@
+subprojects {
+    apply plugin: 'java-library'
+    apply plugin: 'maven-publish'
+
+    group = 'io.github.leejunhao791.sdktoolkit'
+    version = '0.1.0'
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+            }
+        }
+        repositories {
+            maven {
+                name = 'handoff'
+                url = uri(providers.gradleProperty('toolkitRepo').get())
+            }
+        }
+    }
+}
+
+project(':java-device-sdk') {
+    dependencies {
+        api project(':java-core')
+    }
+}

@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application' version '8.13.1'
+}
+
+android {
+    namespace 'io.github.leejunhao791.sdktoolkit.consumer'
+    compileSdk 35
+    defaultConfig {
+        minSdk 23
+        targetSdk 35
+    }
+}
+
+dependencies {
+    implementation providers.gradleProperty('toolkitCoordinate').get()
+}

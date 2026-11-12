@@ -1,0 +1,11 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation providers.gradleProperty('toolkitCoordinate').get()
+}
+
+application {
+    mainClass = 'io.github.leejunhao791.sdktoolkit.consumer.Smoke'
+}

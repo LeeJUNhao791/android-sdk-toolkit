@@ -1,6 +1,10 @@
 plugins {
     id 'com.android.library'
+    id 'maven-publish'
 }
+
+group = 'io.github.leejunhao791.sdktoolkit'
+version = '0.1.0'
 
 android {
     namespace 'io.github.leejunhao791.sdktoolkit'
@@ -20,5 +24,27 @@ android {
             path 'src/main/cpp/CMakeLists.txt'
             version '3.22.1'
         }
+    }
+
+    publishing {
+        singleVariant('release')
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'handoff'
+            url = uri(providers.gradleProperty('toolkitRepo').getOrElse(
+                layout.buildDirectory.dir('handoff-repo').get().asFile.absolutePath
+            ))
+        }
+    }
+}
+
+afterEvaluate {
+    publishing.publications.create('release', MavenPublication) {
+        artifactId = 'device-sdk'
+        from components.release
     }
 }

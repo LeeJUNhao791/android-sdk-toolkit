@@ -1,0 +1,24 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+def coordinate = providers.gradleProperty('toolkitCoordinate').get()
+
+dependencyResolutionManagement {
+    repositories {
+        exclusiveContent {
+            forRepository {
+                maven { url = uri(providers.gradleProperty('toolkitRepo').get()) }
+            }
+            filter { includeGroup(coordinate.split(':')[0]) }
+        }
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'aar-consumer'

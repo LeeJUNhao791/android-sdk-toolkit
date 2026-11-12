@@ -88,6 +88,32 @@ for the checker.
 Run the diagnosis tests with
 `python -B -m unittest discover -s skills/android-jni-doctor/tests -v`.
 
+## Package and verify an SDK handoff
+
+Publish a Gradle AAR or JAR into a fresh local Maven repository, then check
+that a separate consumer can use the published coordinate. Set `JAVA_HOME`
+to a JDK 17 installation for the examples and run from the repository root.
+
+```sh
+python skills/android-sdk-pack/scripts/publish_sdk.py examples/android-sdk examples/consumers/android --kind aar --coordinate io.github.leejunhao791.sdktoolkit:device-sdk:0.1.0 --output build/handoff-aar
+python skills/android-sdk-pack/scripts/publish_sdk.py examples/java-sdk examples/consumers/java --wrapper examples/android-sdk --kind jar --coordinate io.github.leejunhao791.sdktoolkit:java-device-sdk:0.1.0 --output build/handoff-jar
+```
+
+Choose a fresh output directory for each run. The script delivers the Maven
+repository after the consumer check succeeds. The JSON includes the artifact
+and POM paths. The Android consumer assembles an APK that compiles a call
+to the SDK. The Java consumer runs a call that uses a transitive dependency
+declared by the JAR producer.
+
+For your own SDK, use a Gradle Maven repository named `handoff` that reads
+`toolkitRepo` as its URL. The consumer resolves `toolkitCoordinate` from
+`toolkitRepo`, then exposes `assembleDebug` for AARs or `run` for JARs. The
+[SDK packaging Skill](skills/android-sdk-pack) and the example projects show
+the required setup. The script invokes Gradle builds from the supplied projects.
+
+Run the handoff tests with
+`python -B -m unittest discover -s skills/android-sdk-pack/tests -v`.
+
 ## License
 
 [MIT](LICENSE)

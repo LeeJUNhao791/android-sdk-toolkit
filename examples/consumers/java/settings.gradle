@@ -1,0 +1,7 @@
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri(providers.gradleProperty('toolkitRepo').get()) }
+    }
+}
+
+rootProject.name = 'jar-consumer'
