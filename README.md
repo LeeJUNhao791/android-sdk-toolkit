@@ -131,6 +131,35 @@ the required setup. The script invokes Gradle builds from the supplied projects.
 Run the handoff tests with
 `python -B -m unittest discover -s skills/android-sdk-pack/tests -v`.
 
+### Verify the AAR on an Android device
+
+Use a phone or development board running Android 6.0 or later with ADB
+enabled. For ARM64 acceptance, the device must support `arm64-v8a`. Run from
+the repository root with the Android build tools listed above. Use a fresh
+`build/device-handoff` directory. On Windows, use `gradlew.bat` in place of
+`gradlew`.
+
+```sh
+python skills/android-sdk-pack/scripts/publish_sdk.py examples/android-sdk examples/consumers/android --kind aar --coordinate io.github.leejunhao791.sdktoolkit:device-sdk:0.1.0 --output build/device-handoff
+./examples/android-sdk/gradlew -p examples/consumers/android "-PtoolkitRepo=$PWD/build/device-handoff" "-PtoolkitCoordinate=io.github.leejunhao791.sdktoolkit:device-sdk:0.1.0" :assembleDebug :assembleDebugAndroidTest
+adb install -r examples/consumers/android/build/outputs/apk/debug/aar-consumer-debug.apk
+adb install -r -t examples/consumers/android/build/outputs/apk/androidTest/debug/aar-consumer-debug-androidTest.apk
+adb shell am instrument -w -r io.github.leejunhao791.sdktoolkit.consumer.test/io.github.leejunhao791.sdktoolkit.consumer.JniSmokeRunner
+```
+
+If multiple devices are connected, pass `-s SERIAL` to each ADB command.
+The test calls `DeviceSdk.roundTrip(42)` through the consumer app. A pass
+includes `jni_result=42` and `INSTRUMENTATION_CODE: -1`. For ARM64, check
+`process_64_bit=true` and confirm that the following command shows
+`primaryCpuAbi=arm64-v8a`:
+
+```sh
+adb shell dumpsys package io.github.leejunhao791.sdktoolkit.consumer
+```
+
+Verified on Pixel 4 XL with Android 11 (API 30, build `RQ2A.210505.002`).
+The app selected `arm64-v8a`, and the JNI call returned `42` in a 64-bit process.
+
 ## Regression checks
 
 [SDK Toolkit CI](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml) runs the Skill tests on

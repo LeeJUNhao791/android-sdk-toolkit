@@ -8,6 +8,7 @@ android {
     defaultConfig {
         minSdk 23
         targetSdk 35
+        testInstrumentationRunner 'io.github.leejunhao791.sdktoolkit.consumer.JniSmokeRunner'
     }
 }
 
