@@ -58,6 +58,36 @@ directory to use it as a Skill. See the
 [Android AAR documentation](https://developer.android.com/studio/projects/android-library#aar-contents)
 for the archive layout.
 
+## JNI load diagnosis
+
+Give the checker the final APK, the app's selected ABI, and a log from the
+same failed run.
+
+```sh
+python skills/android-jni-doctor/scripts/jni_doctor.py app.apk --abi arm64-v8a --log app-log.txt
+```
+
+Use `--library libdevice.so` when you know the library and the log omits its
+filename. The JSON report identifies a missing APK entry, an ELF architecture
+mismatch, or a logged JNI binding failure when the evidence supports it.
+Exit 0 means the report was produced, including an undetermined result.
+Exit 2 means invalid input.
+
+The package check covers the supplied APK. Installed split APKs, system
+libraries, and runtime `RegisterNatives` behavior may need separate evidence.
+See the [Android JNI guide](https://developer.android.com/ndk/guides/jni-tips).
+
+Build `:app:assembleDebug` in [the Android example](examples/android-sdk)
+and install its debug APK on a test device or emulator. Launch it with
+`adb shell am start -S -n io.github.leejunhao791.sdktoolkit.demo/.MainActivity`
+to run the successful native call. Add `--es scenario missing` for a
+missing-library error or `--es scenario binding` for a method-binding error.
+The `SdkToolkitDemo` log tag records the result. Capture that log in UTF-8
+for the checker.
+
+Run the diagnosis tests with
+`python -B -m unittest discover -s skills/android-jni-doctor/tests -v`.
+
 ## License
 
 [MIT](LICENSE)

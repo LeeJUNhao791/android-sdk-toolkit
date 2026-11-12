@@ -1,0 +1,20 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.leejunhao791.sdktoolkit.demo'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.leejunhao791.sdktoolkit.demo'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+}
+
+dependencies {
+    implementation project(':sdk')
+}
