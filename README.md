@@ -131,6 +131,20 @@ the required setup. The script invokes Gradle builds from the supplied projects.
 Run the handoff tests with
 `python -B -m unittest discover -s skills/android-sdk-pack/tests -v`.
 
+## Regression checks
+
+[SDK Toolkit CI](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml) runs the Skill tests on
+Windows and Linux. The Linux integration job builds and checks the real AAR
+and JAR examples. It rejects an x86-64 library in the ARM64 AAR path and
+consumers that resolve either no SDK or different bytes at the same coordinate.
+
+With JDK 17 and the Android tools listed above, run the integration tests
+locally from the repository root:
+
+```sh
+python -B -m unittest discover -s tests -v
+```
+
 ## License
 
 [MIT](LICENSE)
