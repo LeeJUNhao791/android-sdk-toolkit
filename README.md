@@ -128,14 +128,20 @@ For your own SDK, use a Gradle Maven repository named `handoff` that reads
 [SDK packaging Skill](skills/android-sdk-pack) and the example projects show
 the required setup. The script invokes Gradle builds from the supplied projects.
 
+For multiple matching tasks or Android flavors, pass a full Gradle task path
+with `--consumer-task`, such as `:app:assembleDemoDebug` for an AAR or
+`:cli:run` for a JAR. The artifact check uses that task's project and runtime
+classpath, such as `demoDebugRuntimeClasspath` for `assembleDemoDebug`.
+
 Run the handoff tests with
 `python -B -m unittest discover -s skills/android-sdk-pack/tests -v`.
 
 ### Verify the AAR on an Android device
 
-Use a phone or development board running Android 6.0 or later with ADB
-enabled. For ARM64 acceptance, the device must support `arm64-v8a`. Run from
-the repository root with the Android build tools listed above. Use a fresh
+Use a phone, development board, or emulator running 64-bit Android 6.0 (API 23)
+or later. Enable ADB and check that the system exposes `arm64-v8a` or `x86_64`.
+For ARM64 acceptance, use `arm64-v8a`. Run from the repository root with the
+Android build tools listed above. Use a fresh
 `build/device-handoff` directory. On Windows, use `gradlew.bat` in place of
 `gradlew`.
 
@@ -157,15 +163,26 @@ includes `jni_result=42` and `INSTRUMENTATION_CODE: -1`. For ARM64, check
 adb shell dumpsys package io.github.leejunhao791.sdktoolkit.consumer
 ```
 
-Verified on Pixel 4 XL with Android 11 (API 30, build `RQ2A.210505.002`).
-The app selected `arm64-v8a`, and the JNI call returned `42` in a 64-bit process.
+Measure the device's page size with `adb shell getconf PAGE_SIZE` before
+running the test. A 16 KB environment reports `16384`.
+
+| Device | Android | App ABI | Page size | JNI result |
+| --- | --- | --- | --- | --- |
+| Pixel 4 XL | 11 (API 30, `RQ2A.210505.002`) | `arm64-v8a` | Unrecorded | Pass, returned `42` in a 64-bit process |
+| Qualcomm Kalama | 15 (API 35, `AQ3A.250716.002`) | `arm64-v8a` | 4 KB (`4096`) | Pass, returned `42` in a 64-bit process |
+| OnePlus PJA110 | 16 (API 36, `BP2A.250605.015`) | `arm64-v8a` | 4 KB (`4096`) | Pass, returned `42` in a 64-bit process |
+| Qualcomm Volcano | 16 (API 36, `BQ2A.250622.001-BP2A.250605.031.A3`) | `arm64-v8a` | 4 KB (`4096`) | Pass, returned `42` in a 64-bit process |
+
+Runtime checks on an ARM64 device with 16 KB pages and on Android 6.0
+(API 23) are pending.
 
 ## Regression checks
 
 [SDK Toolkit CI](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml) runs the Skill tests on
-Windows and Linux. The Linux integration job builds and checks the real AAR
-and JAR examples. It rejects an x86-64 library in the ARM64 AAR path and
-consumers that resolve either no SDK or different bytes at the same coordinate.
+Windows and Linux. The Linux integration job builds the JNI test APK and
+checks the real AAR and JAR examples. It rejects an x86-64 library in the ARM64
+AAR path and verifies that the selected consumer module and variant resolve
+the published SDK bytes at the requested coordinate.
 
 With JDK 17 and the Android tools listed above, run the integration tests
 locally from the repository root:

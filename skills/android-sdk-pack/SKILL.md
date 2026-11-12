@@ -13,7 +13,9 @@ coordinate and exercises a public API.
 Configure a Gradle Maven repository named `handoff` using the `toolkitRepo`
 property. In the consumer, resolve the `toolkitCoordinate` dependency from
 that repository. Use `assembleDebug` as the AAR consumer check and `run` as
-the JAR consumer check.
+the JAR consumer check. For multiple matching tasks or Android flavors, pass
+`--consumer-task` with a full task path such as `:app:assembleDemoDebug` or
+`:cli:run`. The check uses the selected task's project and runtime classpath.
 
 ```sh
 python scripts/publish_sdk.py producer consumer --kind aar --coordinate example:sdk:1.0 --output build/handoff

@@ -25,7 +25,7 @@ class SdkHandoff(unittest.TestCase):
         wrapper.touch()
         consumer.mkdir()
         self.args = SimpleNamespace(
-            producer=producer, consumer=consumer, wrapper=None, kind="aar",
+            producer=producer, consumer=consumer, wrapper=None, kind="aar", consumer_task=None,
             coordinate="example.device:sdk:1.0", output=root / "verified",
         )
 
@@ -54,6 +54,7 @@ class SdkHandoff(unittest.TestCase):
                 self.assertEqual(len(commands), 2)
                 self.assertIn("publishAllPublicationsToHandoffRepository", commands[0])
                 self.assertIn(task, commands[1])
+                self.assertIn(f"-PtoolkitConsumerTask={task}", commands[1])
                 self.assertIn(":verifySdkHandoff", commands[1])
                 init_script = Path(commands[1][commands[1].index("--init-script") + 1])
                 self.assertTrue(init_script.is_file())

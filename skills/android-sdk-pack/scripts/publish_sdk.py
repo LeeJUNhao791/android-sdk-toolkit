@@ -20,6 +20,14 @@ def handoff(args):
     ):
         raise ValueError("Expected Maven coordinate group:artifact:version.")
     group, artifact, version = fields
+    verify_task = {"aar": "assembleDebug", "jar": "run"}[args.kind]
+    if args.consumer_task is not None:
+        verify_task = args.consumer_task
+        parts = verify_task.split(":")
+        name = parts[-1]
+        valid_name = name == "run" if args.kind == "jar" else re.fullmatch(r"assemble[A-Z]\w*", name)
+        if not verify_task.startswith(":") or not all(parts[1:]) or not valid_name:
+            raise ValueError("Use a full Gradle task path, such as :app:assembleDemoDebug for AAR or :app:run for JAR.")
     producer = args.producer.resolve()
     consumer = args.consumer.resolve()
     if not producer.is_dir() or not consumer.is_dir() or producer == consumer:
@@ -36,7 +44,6 @@ def handoff(args):
     gradle = [java, "-classpath", str(wrapper), "org.gradle.wrapper.GradleWrapperMain"]
     artifact_path = Path(*group.split("."), artifact, version, f"{artifact}-{version}.{args.kind}")
     pom_path = artifact_path.with_suffix(".pom")
-    verify_task = {"aar": "assembleDebug", "jar": "run"}[args.kind]
     consumer_check = Path(__file__).resolve().with_name("verify_consumer.gradle")
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -51,7 +58,8 @@ def handoff(args):
             raise ValueError(f"Missing published artifact and POM for {args.coordinate}.")
         subprocess.run(
             [*gradle, *properties, "--init-script", str(consumer_check),
-             f"-PtoolkitExpectedArtifact={repo / artifact_path}", ":verifySdkHandoff", verify_task],
+             f"-PtoolkitExpectedArtifact={repo / artifact_path}",
+             f"-PtoolkitConsumerTask={verify_task}", ":verifySdkHandoff", verify_task],
             cwd=consumer, stdout=sys.stderr, check=True,
         )
         repo.rename(output)
@@ -73,6 +81,7 @@ def main():
     parser.add_argument("--coordinate", required=True, help="Published group:artifact:version.")
     parser.add_argument("--output", type=Path, required=True, help="New local Maven repository directory.")
     parser.add_argument("--wrapper", type=Path, help="Gradle wrapper project (defaults to producer).")
+    parser.add_argument("--consumer-task", help="Full path to the consumer task, such as :app:assembleDemoDebug or :app:run.")
     args = parser.parse_args()
     try:
         result = handoff(args)

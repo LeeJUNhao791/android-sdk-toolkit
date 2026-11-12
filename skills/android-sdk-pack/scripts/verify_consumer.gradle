@@ -22,32 +22,42 @@ gradle.projectsEvaluated {
             def published = new File(root.providers.gradleProperty('toolkitExpectedArtifact').get())
             def expectedHash = sha256(published)
             def isAndroid = published.name.endsWith('.aar')
-            def matched = root.allprojects.any { project ->
-                project.configurations.any { configuration ->
-                    def name = configuration.name
-                    def isRuntime = isAndroid
-                        ? name == 'debugRuntimeClasspath' || name.endsWith('DebugRuntimeClasspath')
-                        : name == 'runtimeClasspath'
-                    if (!configuration.canBeResolved || !isRuntime) {
-                        return false
-                    }
-                    def view = configuration.incoming.artifactView {
-                        componentFilter { id ->
-                            id instanceof ModuleComponentIdentifier &&
-                                id.group == group && id.module == module && id.version == version
-                        }
-                    }
-                    view.files.files.any { file ->
-                        file.isFile() && sha256(file) == expectedHash
-                    }
+            def selector = root.providers.gradleProperty('toolkitConsumerTask').get()
+            def targets = gradle.taskGraph.allTasks.findAll { task ->
+                task.path == selector || task.name == selector
+            }
+            if (targets.size() != 1) {
+                throw new GradleException(
+                    "Choose one consumer task with --consumer-task. '${selector}' matched ${targets*.path}."
+                )
+            }
+            def target = targets[0]
+            def runtime = isAndroid
+                ? target.name.substring('assemble'.length()).uncapitalize() + 'RuntimeClasspath'
+                : 'runtimeClasspath'
+            def configuration = target.project.configurations.findByName(runtime)
+            def context = "${target.path} (${runtime})"
+            if (!configuration?.canBeResolved) {
+                throw new GradleException(
+                    "Consumer did not resolve the matching published artifact ${coordinate} for ${context}. " +
+                    'Choose a task with its own runtime classpath using --consumer-task.'
+                )
+            }
+            def view = configuration.incoming.artifactView {
+                componentFilter { id ->
+                    id instanceof ModuleComponentIdentifier &&
+                        id.group == group && id.module == module && id.version == version
                 }
+            }
+            def matched = view.files.files.any { file ->
+                file.isFile() && sha256(file) == expectedHash
             }
             if (!matched) {
                 throw new GradleException(
-                    "Consumer did not resolve the matching published artifact ${coordinate} on a runtime classpath."
+                    "Consumer did not resolve the matching published artifact ${coordinate} for ${context}."
                 )
             }
-            logger.lifecycle("Verified consumer runtime artifact ${coordinate}")
+            logger.lifecycle("Verified consumer runtime artifact ${coordinate} for ${context}")
         }
     }
 }
