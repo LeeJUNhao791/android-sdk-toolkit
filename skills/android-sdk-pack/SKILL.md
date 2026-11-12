@@ -21,5 +21,7 @@ python scripts/publish_sdk.py producer consumer --kind aar --coordinate example:
 
 Set `JAVA_HOME` to the JDK used for the Gradle build. Use `--wrapper` if the
 producer shares a Gradle wrapper from another project. Report the artifact,
-POM and consumer task after success. Treat an Android compile as evidence of
+POM and consumer task after success. The script also checks that a consumer
+runtime classpath resolves the expected Maven coordinate and matches the
+published artifact's SHA-256. Treat an Android compile as evidence of
 dependency resolution and compilation. Run a device test for JNI behavior.

@@ -54,11 +54,17 @@ class SdkHandoff(unittest.TestCase):
                 self.assertEqual(len(commands), 2)
                 self.assertIn("publishAllPublicationsToHandoffRepository", commands[0])
                 self.assertIn(task, commands[1])
+                self.assertIn(":verifySdkHandoff", commands[1])
+                init_script = Path(commands[1][commands[1].index("--init-script") + 1])
+                self.assertTrue(init_script.is_file())
+                expected = next(arg for arg in commands[1] if arg.startswith("-PtoolkitExpectedArtifact="))
+                self.assertTrue(expected.endswith(f"sdk-1.0.{kind}"))
                 self.assertEqual(
                     [arg for arg in commands[0] if arg.startswith("-PtoolkitRepo=")],
                     [arg for arg in commands[1] if arg.startswith("-PtoolkitRepo=")],
                 )
                 self.assertIn("-PtoolkitCoordinate=example.device:sdk:1.0", commands[1])
+                self.assertTrue(report["consumer_artifact_verified"])
                 self.assertTrue(Path(report["artifact"]).is_file())
                 self.assertTrue(Path(report["pom"]).is_file())
 

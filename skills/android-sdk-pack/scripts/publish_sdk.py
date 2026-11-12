@@ -37,6 +37,7 @@ def handoff(args):
     artifact_path = Path(*group.split("."), artifact, version, f"{artifact}-{version}.{args.kind}")
     pom_path = artifact_path.with_suffix(".pom")
     verify_task = {"aar": "assembleDebug", "jar": "run"}[args.kind]
+    consumer_check = Path(__file__).resolve().with_name("verify_consumer.gradle")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".sdk-handoff-", dir=output.parent) as directory:
@@ -49,7 +50,9 @@ def handoff(args):
         if not (repo / artifact_path).is_file() or not (repo / pom_path).is_file():
             raise ValueError(f"Missing published artifact and POM for {args.coordinate}.")
         subprocess.run(
-            [*gradle, *properties, verify_task], cwd=consumer, stdout=sys.stderr, check=True,
+            [*gradle, *properties, "--init-script", str(consumer_check),
+             f"-PtoolkitExpectedArtifact={repo / artifact_path}", ":verifySdkHandoff", verify_task],
+            cwd=consumer, stdout=sys.stderr, check=True,
         )
         repo.rename(output)
     return {
@@ -58,6 +61,7 @@ def handoff(args):
         "artifact": str(output / artifact_path),
         "pom": str(output / pom_path),
         "consumer_task": verify_task,
+        "consumer_artifact_verified": True,
     }
 
 

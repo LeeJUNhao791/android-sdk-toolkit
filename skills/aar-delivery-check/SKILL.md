@@ -1,6 +1,6 @@
 ---
 name: aar-delivery-check
-description: Check an Android AAR against expected native libraries, target ABIs, and required archive entries such as R8 consumer rules. Use for SDK handoffs, release checks, and missing files in delivered AARs.
+description: Check an Android AAR against expected native libraries, target ABIs, and required archive entries such as R8 consumer rules. Verify ELF headers when reviewing native SDK handoffs, releases, or a suspected ABI mismatch.
 license: MIT
 ---
 
@@ -15,9 +15,11 @@ python scripts/check_aar.py vendor.aar --expect expect.json
 ```
 
 Use the script's absolute path when running from another directory. Report the
-JSON status and any missing paths. Exit 0 means the delivery requirements
-passed, 1 means expected entries are missing, and 2 means input or usage error.
+JSON status and any missing paths. Add `--verify-abi` to check the ELF
+architecture of the present native libraries listed in `native_libraries`.
+Report both the expected and detected ABI on a mismatch.
 
-The script inspects archive entries. Treat APK packaging, JNI loading, and
+Exit 0 means the selected checks passed, 1 means a delivery check failed,
+and 2 means input or usage error. Treat APK packaging, JNI loading, and
 R8 behavior as separate checks that require the corresponding build or runtime
 evidence.

@@ -1,0 +1,53 @@
+import java.security.MessageDigest
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+String sha256(File file) {
+    def digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[65536]
+        int count
+        while ((count = stream.read(buffer)) != -1) {
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().encodeHex().toString()
+}
+
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.tasks.register('verifySdkHandoff') {
+        doLast {
+            def coordinate = root.providers.gradleProperty('toolkitCoordinate').get()
+            def (group, module, version) = coordinate.split(':')
+            def published = new File(root.providers.gradleProperty('toolkitExpectedArtifact').get())
+            def expectedHash = sha256(published)
+            def isAndroid = published.name.endsWith('.aar')
+            def matched = root.allprojects.any { project ->
+                project.configurations.any { configuration ->
+                    def name = configuration.name
+                    def isRuntime = isAndroid
+                        ? name == 'debugRuntimeClasspath' || name.endsWith('DebugRuntimeClasspath')
+                        : name == 'runtimeClasspath'
+                    if (!configuration.canBeResolved || !isRuntime) {
+                        return false
+                    }
+                    def view = configuration.incoming.artifactView {
+                        componentFilter { id ->
+                            id instanceof ModuleComponentIdentifier &&
+                                id.group == group && id.module == module && id.version == version
+                        }
+                    }
+                    view.files.files.any { file ->
+                        file.isFile() && sha256(file) == expectedHash
+                    }
+                }
+            }
+            if (!matched) {
+                throw new GradleException(
+                    "Consumer did not resolve the matching published artifact ${coordinate} on a runtime classpath."
+                )
+            }
+            logger.lifecycle("Verified consumer runtime artifact ${coordinate}")
+        }
+    }
+}

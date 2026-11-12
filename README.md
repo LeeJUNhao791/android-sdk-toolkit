@@ -18,12 +18,9 @@ Use `native_libraries` to map library filenames to required ABIs. Use
 `required_entries` for exact archive paths, such as `proguard.txt` if the
 delivery calls for that file. The script always requires `AndroidManifest.xml`.
 The JSON report lists the checked paths and missing entries. Exit 0 means
-pass, 1 means missing entries, and 2 means invalid input.
+pass, 1 means a delivery check failed, and 2 means invalid input.
 
-The AAR check verifies file presence. Check the final APK and run the app
-to verify native loading.
-
-### Try three fixtures
+### Try the missing-entry fixtures
 
 Run these commands separately. The last two checks return exit code 1.
 
@@ -34,8 +31,25 @@ python skills/aar-delivery-check/scripts/check_aar.py build/aar-fixtures/missing
 python skills/aar-delivery-check/scripts/check_aar.py build/aar-fixtures/missing-r8-rules.aar --expect skills/aar-delivery-check/examples/expect.json
 ```
 
-The fixtures exercise ZIP entry checks. The native entries in these fixtures
-are placeholders.
+The fixtures use small test ELF headers. Build the Android example below
+to check complete NDK-built libraries.
+
+### Verify native architecture
+
+Add `--verify-abi` to compare the ELF class and machine with each present
+entry listed in `native_libraries`. Android uses little-endian ELF. Missing
+entries stay in `missing_entries`. Header results appear in `abi_checks`,
+including the expected and detected ABI when available.
+
+```sh
+python skills/aar-delivery-check/scripts/check_aar.py build/aar-fixtures/wrong-abi.aar --expect skills/aar-delivery-check/examples/expect.json --verify-abi
+```
+
+This fixture has every expected path. The library under
+`jni/arm64-v8a/libdevice.so` contains an x86-64 header, so ABI verification
+reports `abi_mismatch` and returns exit code 1. Check the final APK and run
+the app to verify native loading. See the
+[Android ABI guide](https://developer.android.com/ndk/guides/abis).
 
 ### Build the Android example
 
@@ -49,7 +63,7 @@ NDK `28.2.13676358`, and CMake `3.22.1`. Run from its directory:
 On Windows, use `gradlew.bat`. From the repository root, check the real AAR:
 
 ```sh
-python skills/aar-delivery-check/scripts/check_aar.py examples/android-sdk/sdk/build/outputs/aar/sdk-release.aar --expect skills/aar-delivery-check/examples/expect.json
+python skills/aar-delivery-check/scripts/check_aar.py examples/android-sdk/sdk/build/outputs/aar/sdk-release.aar --expect skills/aar-delivery-check/examples/expect.json --verify-abi
 python -B -m unittest discover -s skills/aar-delivery-check/tests -v
 ```
 
@@ -100,10 +114,13 @@ python skills/android-sdk-pack/scripts/publish_sdk.py examples/java-sdk examples
 ```
 
 Choose a fresh output directory for each run. The script delivers the Maven
-repository after the consumer check succeeds. The JSON includes the artifact
-and POM paths. The Android consumer assembles an APK that compiles a call
-to the SDK. The Java consumer runs a call that uses a transitive dependency
-declared by the JAR producer.
+repository after it verifies the selected artifact on a consumer runtime
+classpath and the smoke task succeeds. It matches the resolved Maven
+coordinate and compares SHA-256 with the freshly published AAR or JAR.
+The JSON includes the artifact and POM paths and `consumer_artifact_verified`.
+The Android consumer assembles an APK that compiles a call to the SDK. The Java
+consumer runs a call that uses a transitive dependency declared by the JAR
+producer.
 
 For your own SDK, use a Gradle Maven repository named `handoff` that reads
 `toolkitRepo` as its URL. The consumer resolves `toolkitCoordinate` from
