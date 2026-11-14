@@ -21,6 +21,16 @@ Exit codes are 0 for passing alignment checks, 1 for misalignment, 2 for
 invalid or unsupported input, and 3 when there are no ARM64 or x86-64 libraries
 and the applicable ZIP checks found no issue.
 
+Use `--aar-manifest resolved-aars.json` when you have the external AAR paths
+and resolved coordinates from the consumer variant's Gradle runtime classpath.
+Supply a JSON object with `consumer_configuration` (for example
+`:app:demoDebugRuntimeClasspath`) and an `artifacts` array of objects with
+`coordinate` (`group:module:version`) and `path` (an absolute or manifest-relative
+`.aar` path). For alignment failures, `origin` compares the ABI, filename and
+SHA-256 of the native payload. Treat matches as candidates among the supplied
+AARs. APK-only analysis or a native binary changed during packaging can leave
+its origin undetermined.
+
 Run on each APK delivered to the device when using split APKs. This check covers
 native alignment in the supplied APK. Assess GNU_RELRO layout separately and
 verify installation and JNI execution on a device or emulator where
