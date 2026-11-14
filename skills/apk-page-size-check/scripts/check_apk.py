@@ -2,6 +2,7 @@
 """Check native library LOAD and ZIP alignment in a final APK for 16 KB Android pages."""
 
 import argparse
+import hashlib
 import json
 import struct
 import sys
@@ -80,6 +81,82 @@ def read_to_end(stream):
         pass
 
 
+def entry_sha256(archive, entry):
+    digest = hashlib.sha256()
+    with archive.open(entry) as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def load_aar_manifest(path):
+    manifest = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(manifest, dict) or set(manifest) != {"consumer_configuration", "artifacts"}:
+        raise ValueError("Expected consumer_configuration and artifacts in the AAR manifest.")
+    configuration = manifest["consumer_configuration"]
+    if not isinstance(configuration, str) or not configuration.strip():
+        raise ValueError("Expected the consumer runtime classpath in consumer_configuration.")
+    if not isinstance(manifest["artifacts"], list):
+        raise ValueError("Expected an array of resolved AAR artifacts.")
+
+    artifacts = {}
+    for artifact in manifest["artifacts"]:
+        if not isinstance(artifact, dict) or set(artifact) != {"coordinate", "path"}:
+            raise ValueError("Expected coordinate and path for each resolved AAR.")
+        coordinate = artifact["coordinate"]
+        parts = coordinate.split(":") if isinstance(coordinate, str) else []
+        if len(parts) != 3 or any(not part or any(char.isspace() for char in part) for part in parts):
+            raise ValueError("Expected a resolved Gradle coordinate in group:module:version form.")
+        filename = artifact["path"]
+        if not isinstance(filename, str) or Path(filename).suffix.lower() != ".aar":
+            raise ValueError("Expected an .aar path for each resolved artifact.")
+        aar = (path.parent / filename).resolve()
+        artifacts[coordinate, aar] = None
+    return configuration, list(artifacts)
+
+
+def find_aar_origins(artifacts, apk_digests):
+    target_entries = {"jni/" + entry[4:]: entry for entry in apk_digests}
+    candidates = {entry: [] for entry in apk_digests}
+    for coordinate, aar in artifacts:
+        try:
+            with ZipFile(aar) as archive:
+                if "AndroidManifest.xml" not in archive.namelist():
+                    raise ValueError("Missing AndroidManifest.xml.")
+                seen = set()
+                for entry in archive.infolist():
+                    apk_entry = target_entries.get(entry.filename)
+                    if apk_entry is None:
+                        continue
+                    if entry.filename in seen:
+                        raise ValueError(f"Duplicate AAR entry: {entry.filename}")
+                    seen.add(entry.filename)
+                    if entry.compress_type not in (ZIP_STORED, ZIP_DEFLATED):
+                        raise ValueError(f"Unsupported AAR ZIP compression method: {entry.filename}")
+                    if entry_sha256(archive, entry) == apk_digests[apk_entry]:
+                        candidates[apk_entry].append({
+                            "coordinate": coordinate, "aar": str(aar), "entry": entry.filename,
+                        })
+        except INPUT_ERRORS as error:
+            raise ValueError(f"Invalid resolved AAR {aar}: {error}") from error
+    return candidates
+
+
+def annotate_origins(report, manifest_path, digests):
+    configuration, artifacts = load_aar_manifest(manifest_path)
+    candidates = find_aar_origins(artifacts, digests)
+    report["aar_manifest"] = {"path": str(manifest_path), "consumer_configuration": configuration}
+    statuses = {0: "unknown", 1: "single_candidate"}
+    for library in report["libraries"]:
+        entry = library["entry"]
+        if entry in candidates:
+            matches = candidates[entry]
+            library["origin"] = {
+                "status": statuses.get(len(matches), "multiple_candidates"),
+                "sha256": digests[entry], "candidates": matches,
+            }
+
+
 def check_library(apk, archive, entry, abi):
     result = {"entry": entry.filename, "abi": abi, "elf": "unchecked", "zip": "unchecked"}
     if abi not in ELF64_MACHINES and abi not in ABI32:
@@ -108,7 +185,7 @@ def check_library(apk, archive, entry, abi):
     return result
 
 
-def check_apk(path, libraries):
+def check_apk(path, libraries, digests=None):
     if path.suffix.lower() != ".apk":
         raise ValueError("Input must be an .apk file.")
     with path.open("rb") as apk, ZipFile(apk) as archive:
@@ -128,7 +205,10 @@ def check_apk(path, libraries):
             parts = entry.filename.split("/")
             if len(parts) != 3 or parts[0] != "lib" or not parts[2].endswith(".so"):
                 continue
-            libraries.append(check_library(apk, archive, entry, parts[1]))
+            result = check_library(apk, archive, entry, parts[1])
+            libraries.append(result)
+            if digests is not None and "fail" in (result["elf"], result["zip"]):
+                digests[entry.filename] = entry_sha256(archive, entry)
 
     if any("invalid" in (item["elf"], item["zip"]) for item in libraries):
         return "invalid"
@@ -142,10 +222,14 @@ def check_apk(path, libraries):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
+    parser.add_argument("--aar-manifest", type=Path, help="JSON list of resolved consumer AARs and coordinates.")
     args = parser.parse_args()
     report = {"apk": str(args.apk), "page_size": PAGE_SIZE, "libraries": []}
+    digests = {} if args.aar_manifest is not None else None
     try:
-        report["status"] = check_apk(args.apk, report["libraries"])
+        report["status"] = check_apk(args.apk, report["libraries"], digests)
+        if args.aar_manifest is not None and report["status"] != "invalid":
+            annotate_origins(report, args.aar_manifest, digests)
     except INPUT_ERRORS as error:
         report.update(status="invalid", error=str(error))
     if report["status"] == "not_applicable":

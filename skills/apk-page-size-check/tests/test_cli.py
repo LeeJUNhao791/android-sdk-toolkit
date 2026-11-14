@@ -1,3 +1,4 @@
+import hashlib
 import json
 import struct
 import subprocess
@@ -42,15 +43,36 @@ class ApkPageSizeCheck(unittest.TestCase):
                     info.extra = struct.pack("<HH", 0xCAFE, padding) + bytes(padding)
                 archive.writestr(info, payload)
 
-    def check(self, code, status):
+    def report(self, code, status, *args):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), str(self.apk)], capture_output=True, text=True,
+            [sys.executable, str(SCRIPT), str(self.apk), *map(str, args)],
+            capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, code, result.stderr or result.stdout)
         report = json.loads(result.stdout)
         self.assertEqual(report["status"], status)
         self.assertEqual(report["page_size"], 16384)
+        return report
+
+    def check(self, code, status):
+        report = self.report(code, status)
         return {item["entry"]: item for item in report["libraries"]}
+
+    def aar(self, filename, entries):
+        path = self.apk.with_name(filename)
+        with ZipFile(path, "w") as archive:
+            archive.writestr("AndroidManifest.xml", "fixture manifest")
+            for name, data in entries.items():
+                archive.writestr(name, data)
+        return path
+
+    def aar_manifest(self, *artifacts):
+        path = self.apk.with_name("resolved aars.json")
+        path.write_text(json.dumps({
+            "consumer_configuration": ":app:demoDebugRuntimeClasspath",
+            "artifacts": [{"coordinate": coordinate, "path": str(aar)} for coordinate, aar in artifacts],
+        }), encoding="utf-8")
+        return path
 
     def test_stored_and_compressed_libraries_pass_with_explicit_32_bit_scope(self):
         self.fixture(
@@ -81,6 +103,65 @@ class ApkPageSizeCheck(unittest.TestCase):
         self.assertEqual(checks[X86]["zip"], "fail")
         self.assertEqual(checks[X86]["zip_data_offset"] % 4096, 0)
         self.assertNotEqual(checks[X86]["zip_data_offset"] % 16384, 0)
+        self.assertNotIn("origin", checks[ARM])
+
+    def test_failed_libraries_match_resolved_aars_by_path_abi_and_payload(self):
+        payload = elf(alignment=4096)
+        zip_failure = elf()
+        shared = "lib/arm64-v8a/libshared.so"
+        changed = "lib/arm64-v8a/libchanged.so"
+        passing = "lib/arm64-v8a/libpassing.so"
+        self.fixture(
+            (ARM, payload, ZIP_DEFLATED, None),
+            (shared, zip_failure, ZIP_STORED, None),
+            (changed, payload + b"changed after packaging", ZIP_DEFLATED, None),
+            (passing, zip_failure, ZIP_DEFLATED, None),
+        )
+        first = self.aar("first.aar", {
+            "jni/arm64-v8a/libdevice.so": payload,
+            "jni/arm64-v8a/libshared.so": zip_failure,
+            "jni/arm64-v8a/libchanged.so": payload,
+            "jni/arm64-v8a/libpassing.so": zip_failure,
+        })
+        second = self.aar("second.aar", {
+            "jni/arm64-v8a/libdevice.so": payload + b"same name, different bytes",
+            "jni/arm64-v8a/libshared.so": zip_failure,
+            "jni/x86_64/libchanged.so": payload + b"changed after packaging",
+            "assets/arm64-v8a/libchanged.so": payload + b"changed after packaging",
+        })
+        manifest = self.aar_manifest(
+            ("example:first:1.0", first.name), ("example:second:1.0", second),
+            ("example:first:1.0", first),
+        )
+        report = self.report(1, "fail", "--aar-manifest", manifest)
+        self.assertEqual(report["aar_manifest"]["consumer_configuration"], ":app:demoDebugRuntimeClasspath")
+        libraries = {item["entry"]: item for item in report["libraries"]}
+        self.assertEqual(libraries[ARM]["origin"], {
+            "status": "single_candidate", "sha256": hashlib.sha256(payload).hexdigest(),
+            "candidates": [{"coordinate": "example:first:1.0", "aar": str(first.resolve()),
+                            "entry": "jni/arm64-v8a/libdevice.so"}],
+        })
+        self.assertEqual(libraries[shared]["elf"], "pass")
+        self.assertEqual(libraries[shared]["zip"], "fail")
+        self.assertEqual(libraries[shared]["origin"]["status"], "multiple_candidates")
+        self.assertEqual([item["coordinate"] for item in libraries[shared]["origin"]["candidates"]],
+                         ["example:first:1.0", "example:second:1.0"])
+        self.assertEqual(libraries[changed]["origin"]["status"], "unknown")
+        self.assertEqual(libraries[changed]["origin"]["candidates"], [])
+        self.assertNotIn("origin", libraries[passing])
+
+    def test_invalid_manifest_or_aar_does_not_report_incomplete_origin_candidates(self):
+        self.fixture((ARM, elf(alignment=4096), ZIP_DEFLATED, None))
+        first = self.aar("first.aar", {"jni/arm64-v8a/libdevice.so": elf(alignment=4096)})
+        broken = self.apk.with_name("broken.aar")
+        broken.write_bytes(b"not a zip")
+        manifest = self.aar_manifest(("example:first:1.0", first), ("example:broken:1.0", broken))
+        report = self.report(2, "invalid", "--aar-manifest", manifest)
+        self.assertIn("broken.aar", report["error"])
+        self.assertNotIn("origin", report["libraries"][0])
+        manifest.write_text('{"artifacts": []}', encoding="utf-8")
+        report = self.report(2, "invalid", "--aar-manifest", manifest)
+        self.assertIn("consumer_configuration", report["error"])
 
     def test_compression_does_not_skip_elf_and_offset_must_match_virtual_address(self):
         self.fixture((ARM, elf(address=0x10041), ZIP_DEFLATED, None))

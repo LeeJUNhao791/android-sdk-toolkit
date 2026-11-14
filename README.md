@@ -129,6 +129,49 @@ JNI execution on a 16 KB Android system require separate checks. See
 [Android's 16 KB page size guide](https://developer.android.com/guide/practices/page-sizes)
 and the [runtime procedure below](#verify-the-aar-on-an-android-device).
 
+### Find candidate AARs for failing native libraries
+
+Record the external AAR artifacts Gradle actually resolved on the runtime
+classpath of the module and variant that built the APK. Include transitive
+AARs and use resolved `group:module:version` coordinates. Save the classpath,
+coordinates and artifact paths in a UTF-8 JSON manifest. Relative paths start
+at the manifest's directory. Absolute paths also work.
+
+```json
+{
+  "consumer_configuration": ":app:demoDebugRuntimeClasspath",
+  "artifacts": [
+    {"coordinate": "example:device-sdk:1.0", "path": "aars/device-sdk-1.0.aar"},
+    {"coordinate": "example:vision-sdk:2.0", "path": "aars/vision-sdk-2.0.aar"}
+  ]
+}
+```
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py app.apk --aar-manifest resolved-aars.json
+```
+
+For each ELF or ZIP alignment failure, `origin` compares the APK's
+`lib/<abi>/<name>.so` payload with `jni/<abi>/<name>.so` in the supplied AARs.
+It reports `single_candidate`, `multiple_candidates`, or `unknown` based on
+matching SHA-256 digests. Each candidate lists the supplied coordinate, AAR
+path and matching entry. An invalid manifest or unreadable AAR returns exit 2.
+
+The checker trusts the supplied classpath label and coordinates. A byte match
+identifies a candidate within that list, and a ZIP offset is determined by
+final APK packaging. Stripping or other changes to library bytes, app-local
+libraries and omitted artifacts can yield `unknown`. The APK-only command
+reports alignment without AAR attribution.
+
+Try the synthetic example below. Both AARs have the same native filenames.
+The check returns exit 1 and reports one candidate for `libunique.so`, two
+for `libshared.so`, and `unknown` for `libchanged.so`.
+
+```sh
+python skills/apk-page-size-check/examples/generate_origins.py build/apk-origins
+python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk --aar-manifest build/apk-origins/resolved-aars.json
+```
+
 ## Package and verify an SDK handoff
 
 Publish a Gradle AAR or JAR into a fresh local Maven repository, then check
