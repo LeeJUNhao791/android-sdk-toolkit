@@ -60,7 +60,7 @@ class GithubAction(unittest.TestCase):
         outputs, report, summary = self.run_action()
         self.assertEqual(outputs["status"], "pass")
         self.assertEqual(outputs["exit-code"], "0")
-        self.assertEqual(Path(report["apk"]), self.apk)
+        self.assertTrue(Path(report["apk"]).samefile(self.apk))
         self.assertIn("**pass**", summary)
         self.assertIn(ARM, summary)
         self.assertIn("Static alignment", summary)
