@@ -1,0 +1,34 @@
+name: Android APK 16 KB check
+description: Check final APK alignment and match failing native libraries to supplied candidate AARs.
+inputs:
+  apk:
+    description: Final APK path, absolute or relative to the caller workspace.
+    required: true
+  aar-manifest:
+    description: Optional resolved AAR manifest path, absolute or relative to the caller workspace.
+    required: false
+    default: ''
+outputs:
+  status:
+    description: pass, fail, invalid, or not_applicable.
+    value: ${{ steps.check.outputs.status }}
+  report:
+    description: Absolute path to the JSON report, including when the check fails.
+    value: ${{ steps.check.outputs.report }}
+  exit-code:
+    description: Checker exit code (0 pass, 1 failure, 2 invalid, 3 not applicable).
+    value: ${{ steps.check.outputs.exit-code }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: '3.11'
+    - name: Check APK and write summary
+      id: check
+      shell: bash
+      env:
+        INPUT_APK: ${{ inputs.apk }}
+        INPUT_AAR_MANIFEST: ${{ inputs.aar-manifest }}
+        TOOLKIT_ACTION_PATH: ${{ github.action_path }}
+      run: python -B "$TOOLKIT_ACTION_PATH/skills/apk-page-size-check/scripts/github_action.py"

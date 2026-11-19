@@ -129,6 +129,40 @@ JNI execution on a 16 KB Android system require separate checks. See
 [Android's 16 KB page size guide](https://developer.android.com/guide/practices/page-sizes)
 and the [runtime procedure below](#verify-the-aar-on-an-android-device).
 
+### Use the GitHub Action
+
+After building the final APK in your workflow, add this step. The action sets
+up Python 3.11 and writes a Markdown table to the job summary.
+
+```yaml
+- name: Check APK 16 KB alignment
+  id: alignment
+  uses: LeeJUNhao791/android-sdk-toolkit@main
+  with:
+    apk: app/build/outputs/apk/release/app-release.apk
+    # Optional, using the resolved AAR manifest described below:
+    aar-manifest: build/resolved-aars.json
+- name: Save the JSON report
+  if: always() && steps.alignment.outputs.report != ''
+  uses: actions/upload-artifact@v7
+  with:
+    name: apk-16kb-report
+    path: ${{ steps.alignment.outputs.report }}
+```
+
+Pin the action to a reviewed commit SHA for a stable dependency. Paths are
+absolute or relative to the caller's workspace. AAR paths inside the manifest
+remain relative to the manifest itself. The action uses read-only repository
+permissions and requires no Android SDK installation.
+
+The `status`, `exit-code`, and `report` outputs retain the checker's result and
+JSON report path even on a failed check. Alignment failures (exit code 1) and
+invalid inputs (2) fail the step. A check with no applicable 64-bit libraries
+and no ZIP failures succeeds with `status: not_applicable` and `exit-code: 3`.
+The summary labels this state explicitly. It also lists `single_candidate`,
+`multiple_candidates`, or `unknown` when the AAR manifest is supplied, and
+`not_requested` when candidate matching was not requested.
+
 ### Find candidate AARs for failing native libraries
 
 Record the external AAR artifacts Gradle actually resolved on the runtime
