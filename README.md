@@ -152,8 +152,8 @@ up Python 3.11 and writes a Markdown table to the job summary.
 
 Pin the action to a reviewed commit SHA for a stable dependency. Paths are
 absolute or relative to the caller's workspace. AAR paths inside the manifest
-remain relative to the manifest itself. The action uses read-only repository
-permissions and requires no Android SDK installation.
+remain relative to the manifest itself. The caller can use `contents: read`
+repository permissions. The check requires no Android SDK installation.
 
 The `status`, `exit-code`, and `report` outputs retain the checker's result and
 JSON report path even on a failed check. Alignment failures (exit code 1) and
