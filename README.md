@@ -137,7 +137,7 @@ up Python 3.11 and writes a Markdown table to the job summary.
 ```yaml
 - name: Check APK 16 KB alignment
   id: alignment
-  uses: LeeJUNhao791/android-sdk-toolkit@main
+  uses: LeeJUNhao791/android-sdk-toolkit@v0.7.0
   with:
     apk: app/build/outputs/apk/release/app-release.apk
     # Optional, using the resolved AAR manifest described below:
@@ -162,6 +162,13 @@ and no ZIP failures succeeds with `status: not_applicable` and `exit-code: 3`.
 The summary labels this state explicitly. It also lists `single_candidate`,
 `multiple_candidates`, or `unknown` when the AAR manifest is supplied, and
 `not_requested` when candidate matching was not requested.
+
+Follow the [WebRTC Gradle example](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/3101b54c63e57b06234448f50ee22e73b882451c/examples/apk-16kb-action/README.md#check-a-gradle-built-apk-with-a-third-party-sdk)
+to build a debug APK, export the resolved runtime AARs, and run the action.
+The [CI run](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100)
+shows the original APK passing and an intentionally unaligned ZIP copy failing
+with the WebRTC AAR listed as a candidate. Open the job summary or download the
+`webrtc-apk-16kb-reports` artifact for both JSON reports.
 
 ### Find candidate AARs for failing native libraries
 
