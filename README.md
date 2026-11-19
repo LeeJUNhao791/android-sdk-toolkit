@@ -170,6 +170,12 @@ shows the original APK passing and an intentionally unaligned ZIP copy failing
 with the WebRTC AAR listed as a candidate. Open the job summary or download the
 `webrtc-apk-16kb-reports` artifact for both JSON reports.
 
+The [MediaPipe Gradle example](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/d5f43e846744f53d0c8a90260dd32b217bf8b935/examples/apk-16kb-action/README.md#check-the-upstream-mediapipe-image-classification-apk)
+shows how to export AARs from a multi-module Kotlin DSL app. The original
+Debug APK passed in a [GitHub-hosted CI run](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44480978736).
+Download `mediapipe-apk-16kb-report` from that run for the JSON report and
+the resolved runtime AAR manifest.
+
 ### Find candidate AARs for failing native libraries
 
 Record the external AAR artifacts Gradle actually resolved on the runtime
@@ -177,6 +183,16 @@ classpath of the module and variant that built the APK. Include transitive
 AARs and use resolved `group:module:version` coordinates. Save the classpath,
 coordinates and artifact paths in a UTF-8 JSON manifest. Relative paths start
 at the manifest's directory. Absolute paths also work.
+
+For a Kotlin DSL app, you can register the AAR export task in a Gradle init
+script and pass it with `--init-script` when you build the APK. In a multi-module
+app, use Gradle's `artifactView` and filter for `ModuleComponentIdentifier`
+before resolving files. Resolving all artifacts before filtering can fail
+when a local Android module publishes several artifact variants. Run the action
+in the same job if the manifest points into that job's Gradle cache.
+
+If Maven or model downloads stall on a network that requires a proxy, check
+[Gradle's JVM proxy settings](https://docs.gradle.org/current/userguide/networking.html).
 
 ```json
 {
@@ -203,6 +219,13 @@ identifies a candidate within that list, and a ZIP offset is determined by
 final APK packaging. Stripping or other changes to library bytes, app-local
 libraries and omitted artifacts can yield `unknown`. The APK-only command
 reports alignment without AAR attribution.
+
+In the [MediaPipe Image Classification sample](https://github.com/google-ai-edge/mediapipe-samples/tree/46d60d66baf21ae91977c488ea0875f0e13c4d2b/examples/image_classification/android),
+the Debug APK passed. Its packaged `libmediapipe_tasks_jni.so` differed from
+the AAR bytes after the Gradle strip task. The merged libraries before that
+task matched the transitive AAR `com.google.mediapipe:tasks-core:1.2.2`.
+Compare the pre-strip files with the resolved AARs when you need to trace a
+library whose bytes changed during packaging.
 
 Try the synthetic example below. Both AARs have the same native filenames.
 The check returns exit 1 and reports one candidate for `libunique.so`, two
