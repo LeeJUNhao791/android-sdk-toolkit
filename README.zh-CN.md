@@ -47,7 +47,7 @@ python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk
 
 Action 将检查结果写入 Job Summary，通过 `status`、`exit-code` 和 `report` 输出结果和 JSON 路径。对齐失败或输入无效会使步骤失败。无适用 64 位库且无 ZIP 对齐错误时，步骤成功并返回 `not_applicable`。 [Action 完整用法](README.md#use-the-github-action)
 
-- **WebRTC**。实际 Gradle APK 通过了检查。人为改变 ZIP 数据偏移的对照 APK 失败，报告列出 WebRTC AAR 候选。 [构建与检查步骤](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/3101b54c63e57b06234448f50ee22e73b882451c/examples/apk-16kb-action/README.md#check-a-gradle-built-apk-with-a-third-party-sdk) · [CI 证据](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100)
+- **WebRTC**。实际 Gradle APK 通过了检查。人为改变 ZIP 数据偏移的对照 APK 失败，报告列出 WebRTC AAR 候选。 [构建与检查步骤](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/3101b54c63e57b06234448f50ee22e73b882451c/examples/apk-16kb-action/README.md#check-a-gradle-built-apk-with-a-third-party-sdk) · [APK 检查作业](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100/job/135383913161) · [运行摘要和报告](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100)
 - **MediaPipe**。上游 Image Classification 示例的 Debug APK 通过。Gradle 剥离符号前的合并产物与传递依赖 `com.google.mediapipe:tasks-core:1.2.2` 的 AAR 内容匹配。 [构建与检查步骤](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/d5f43e846744f53d0c8a90260dd32b217bf8b935/examples/apk-16kb-action/README.md#check-the-upstream-mediapipe-image-classification-apk) · [CI 证据](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44480978736)
 
 ## 其他交付工具
