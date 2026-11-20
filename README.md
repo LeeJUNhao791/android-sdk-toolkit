@@ -1,5 +1,7 @@
 # Android SDK Toolkit
 
+[简体中文](README.zh-CN.md)
+
 Small command-line tools and Agent Skills for delivering and integrating Android SDKs.
 
 ## AAR delivery check
@@ -165,10 +167,11 @@ The summary labels this state explicitly. It also lists `single_candidate`,
 
 Follow the [WebRTC Gradle example](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/3101b54c63e57b06234448f50ee22e73b882451c/examples/apk-16kb-action/README.md#check-a-gradle-built-apk-with-a-third-party-sdk)
 to build a debug APK, export the resolved runtime AARs, and run the action.
-The [CI run](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100)
+The [APK verification job](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100/job/135383913161)
 shows the original APK passing and an intentionally unaligned ZIP copy failing
-with the WebRTC AAR listed as a candidate. Open the job summary or download the
-`webrtc-apk-16kb-reports` artifact for both JSON reports.
+with the WebRTC AAR listed as a candidate. Download both JSON reports from
+the `webrtc-apk-16kb-reports` artifact in the
+[run summary](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100) while it is retained.
 
 The [MediaPipe Gradle example](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/d5f43e846744f53d0c8a90260dd32b217bf8b935/examples/apk-16kb-action/README.md#check-the-upstream-mediapipe-image-classification-apk)
 shows how to export AARs from a multi-module Kotlin DSL app. The original
