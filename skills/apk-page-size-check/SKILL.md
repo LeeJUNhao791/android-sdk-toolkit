@@ -31,6 +31,14 @@ SHA-256 of the native payload. Treat matches as candidates among the supplied
 AARs. APK-only analysis or a native binary changed during packaging can leave
 its origin undetermined.
 
+For a stripped library, pass `--native-provenance native-provenance.json`
+alongside `--aar-manifest`. Use the
+[Gradle Debug exporter](examples/export-debug-native-provenance.init.gradle)
+to capture both files from the same build. Check the report's provenance
+status and each origin method. A verified strip chain matches the APK entry
+to the strip task result and the merged input to AAR candidates. ZIP failure
+guidance applies to APK packaging.
+
 Run on each APK delivered to the device when using split APKs. This check covers
 native alignment in the supplied APK. Assess GNU_RELRO layout separately and
 verify installation and JNI execution on a device or emulator where

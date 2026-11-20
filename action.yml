@@ -8,6 +8,10 @@ inputs:
     description: Optional resolved AAR manifest path, absolute or relative to the caller workspace.
     required: false
     default: ''
+  native-provenance:
+    description: Optional same-build Gradle hashes, used with aar-manifest.
+    required: false
+    default: ''
 outputs:
   status:
     description: pass, fail, invalid, or not_applicable.
@@ -30,5 +34,6 @@ runs:
       env:
         INPUT_APK: ${{ inputs.apk }}
         INPUT_AAR_MANIFEST: ${{ inputs.aar-manifest }}
+        INPUT_NATIVE_PROVENANCE: ${{ inputs.native-provenance }}
         TOOLKIT_ACTION_PATH: ${{ github.action_path }}
       run: python -B "$TOOLKIT_ACTION_PATH/skills/apk-page-size-check/scripts/github_action.py"

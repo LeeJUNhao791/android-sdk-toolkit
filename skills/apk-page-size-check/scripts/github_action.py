@@ -20,6 +20,10 @@ def summary(report):
     for key in ("detail", "error"):
         if key in report:
             lines.extend([cell(report[key]), ""])
+    provenance = report.get("native_provenance")
+    if provenance:
+        lines.extend(["Gradle provenance for " + cell(provenance["variant"]) + " · "
+                      + cell(provenance["status"]), ""])
     if report["libraries"]:
         lines.extend(["| Library | ELF | ZIP | Origin | Candidate coordinates |",
                       "| --- | --- | --- | --- | --- |"])
@@ -27,10 +31,15 @@ def summary(report):
             origin = library.get("origin", {})
             coordinates = "<br>".join(cell(candidate["coordinate"])
                                       for candidate in origin.get("candidates", [])) or "-"
-            values = [library["entry"], library["elf"], library["zip"],
-                      origin.get("status", "not_requested")]
+            status = origin.get("status", "not_requested")
+            if origin.get("method"):
+                status += " (" + origin["method"] + ")"
+            values = [library["entry"], library["elf"], library["zip"], status]
             lines.append("| " + " | ".join(map(cell, values)) + " | " + coordinates + " |")
         lines.append("")
+    if any(row["zip"] == "fail" and row["elf"] in ("pass", "not_applicable") for row in report["libraries"]):
+        lines.extend(["For ZIP-only failures, check APK packaging and ZIP alignment. "
+                      "Candidate coordinates list matching AAR entries.", ""])
     lines.extend([
         "Candidate matches use SHA-256 within the supplied AAR list. "
         "Multiple matches and unknown origins remain explicit. "
@@ -48,6 +57,9 @@ def main():
     manifest = os.environ.get("INPUT_AAR_MANIFEST", "")
     if manifest:
         command.extend(["--aar-manifest", str((workspace / manifest).resolve())])
+    provenance = os.environ.get("INPUT_NATIVE_PROVENANCE", "")
+    if provenance:
+        command.extend(["--native-provenance", str((workspace / provenance).resolve())])
     result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
     report = json.loads(result.stdout)
     directory = Path(tempfile.mkdtemp(prefix="apk-16kb-", dir=os.environ["RUNNER_TEMP"]))

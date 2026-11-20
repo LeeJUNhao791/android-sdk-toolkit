@@ -150,6 +150,75 @@ class ApkPageSizeCheck(unittest.TestCase):
         self.assertEqual(libraries[changed]["origin"]["candidates"], [])
         self.assertNotIn("origin", libraries[passing])
 
+    def test_gradle_strip_chain_reports_actual_source_instead_of_final_byte_lookalike(self):
+        merged = elf(alignment=4096) + b"debug symbols"
+        stripped = elf(alignment=4096)
+        self.fixture((ARM, stripped, ZIP_DEFLATED, None))
+        entry = "jni/arm64-v8a/libdevice.so"
+        source = self.aar("source.aar", {entry: merged})
+        lookalike = self.aar("lookalike.aar", {entry: stripped})
+        manifest = self.aar_manifest(("example:source:1", source), ("example:lookalike:1", lookalike))
+        provenance = self.apk.with_name("native-provenance.json")
+        evidence = {
+            "variant": "debug",
+            "apk_sha256": hashlib.sha256(self.apk.read_bytes()).hexdigest(),
+            "aar_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            "libraries": {ARM: {
+                "merged_sha256": hashlib.sha256(merged).hexdigest(),
+                "stripped_sha256": hashlib.sha256(stripped).hexdigest(),
+            }},
+        }
+
+        def run(status):
+            provenance.write_text(json.dumps(evidence), encoding="utf-8")
+            report = self.report(1, "fail", "--aar-manifest", manifest, "--native-provenance", provenance)
+            self.assertEqual(report["native_provenance"]["status"], status)
+            return report["libraries"][0]["origin"]
+
+        origin = run("verified")
+        self.assertEqual(origin["method"], "gradle_strip_chain")
+        self.assertEqual(origin["status"], "single_candidate")
+        self.assertEqual([match["coordinate"] for match in origin["candidates"]], ["example:source:1"])
+        self.assertEqual(origin["merged_sha256"], evidence["libraries"][ARM]["merged_sha256"])
+        self.assertEqual(origin["sha256"], evidence["libraries"][ARM]["stripped_sha256"])
+
+        duplicate = self.aar("duplicate.aar", {entry: merged})
+        self.aar_manifest(("example:source:1", source), ("example:duplicate:1", duplicate))
+        evidence["aar_manifest_sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
+        origin = run("verified")
+        self.assertEqual(origin["status"], "multiple_candidates")
+        self.assertEqual([match["coordinate"] for match in origin["candidates"]],
+                         ["example:source:1", "example:duplicate:1"])
+        self.aar_manifest(("example:source:1", source), ("example:lookalike:1", lookalike))
+        evidence["aar_manifest_sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+        evidence["libraries"][ARM]["merged_sha256"] = "0" * 64
+        self.assertEqual(run("verified")["status"], "unknown")
+        evidence["libraries"][ARM]["stripped_sha256"] = "0" * 64
+        self.assertEqual(run("verified")["method"], "direct_sha256")
+        evidence["aar_manifest_sha256"] = "0" * 64
+        self.assertEqual(run("aar_manifest_mismatch")["method"], "direct_sha256")
+        evidence["apk_sha256"] = "0" * 64
+        self.assertEqual(run("apk_mismatch")["method"], "direct_sha256")
+
+        conflicting_hashes = {"merged_sha256": "0" * 64, "stripped_sha256": hashlib.sha256(stripped).hexdigest()}
+        evidence["apk_sha256"] = hashlib.sha256(self.apk.read_bytes()).hexdigest()
+        evidence["aar_manifest_sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
+        evidence["libraries"][ARM]["stripped_sha256"] = conflicting_hashes["stripped_sha256"]
+        evidence["libraries"][ARM]["merged_sha256"] = hashlib.sha256(merged).hexdigest()
+        duplicate = json.dumps(evidence).replace(
+            '"libraries": {', '"libraries": {' + json.dumps(ARM) + ': ' + json.dumps(conflicting_hashes) + ', ',
+        )
+        provenance.write_text(duplicate, encoding="utf-8")
+        report = self.report(2, "invalid", "--aar-manifest", manifest, "--native-provenance", provenance)
+        self.assertIn("Duplicate native provenance key", report["error"])
+        self.assertNotIn("origin", report["libraries"][0])
+
+    def test_provenance_without_aar_manifest_is_invalid_json_result(self):
+        self.fixture((ARM, elf(), ZIP_DEFLATED, None))
+        report = self.report(2, "invalid", "--native-provenance", self.apk.with_name("evidence.json"))
+        self.assertIn("--aar-manifest", report["error"])
+
     def test_invalid_manifest_or_aar_does_not_report_incomplete_origin_candidates(self):
         self.fixture((ARM, elf(alignment=4096), ZIP_DEFLATED, None))
         first = self.aar("first.aar", {"jni/arm64-v8a/libdevice.so": elf(alignment=4096)})
