@@ -1,5 +1,7 @@
 # Android SDK Toolkit
 
+[简体中文](README.zh-CN.md)
+
 Small command-line tools and Agent Skills for delivering and integrating Android SDKs.
 
 ## AAR delivery check
