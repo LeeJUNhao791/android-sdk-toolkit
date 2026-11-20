@@ -227,8 +227,8 @@ In the [MediaPipe Image Classification sample](https://github.com/google-ai-edge
 the Debug APK passed. Its packaged `libmediapipe_tasks_jni.so` differed from
 the AAR bytes after the Gradle strip task. The merged libraries before that
 task matched the transitive AAR `com.google.mediapipe:tasks-core:1.2.2`.
-Compare the pre-strip files with the resolved AARs when you need to trace a
-library whose bytes changed during packaging.
+Use [same-build provenance](#trace-a-stripped-library-from-the-same-gradle-build)
+to check this relationship.
 
 Try the synthetic example below. Both AARs have the same native filenames.
 The check returns exit 1 and reports one candidate for `libunique.so`, two
@@ -238,6 +238,48 @@ for `libshared.so`, and `unknown` for `libchanged.so`.
 python skills/apk-page-size-check/examples/generate_origins.py build/apk-origins
 python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk --aar-manifest build/apk-origins/resolved-aars.json
 ```
+
+### Trace a stripped library from the same Gradle build
+
+For an Android app at `:app` with an unflavored `debug` variant and one APK, the
+[native provenance example](skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle)
+builds the APK and writes both inputs under `app/build/reports/apk-16kb/`. It
+uses the strip task's input and output directories. This example was verified
+with the pinned MediaPipe sample and AGP 8.13.2. Set `TOOLKIT` to an absolute
+path to this checkout. Run from the Android project's Gradle root. In PowerShell
+use the Gradle batch wrapper and set `$env:TOOLKIT` to the checkout path.
+
+```sh
+./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" :app:exportDebugNativeProvenance
+python "$TOOLKIT/skills/apk-page-size-check/scripts/check_apk.py" app/build/outputs/apk/debug/app-debug.apk \
+  --aar-manifest app/build/reports/apk-16kb/resolved-aars.json \
+  --native-provenance app/build/reports/apk-16kb/native-provenance.json
+```
+
+In a workflow, check out this Toolkit revision under `toolkit` and pass both
+files to the action from the same job that produced them.
+
+```yaml
+- uses: ./toolkit
+  with:
+    apk: app/build/outputs/apk/debug/app-debug.apk
+    aar-manifest: app/build/reports/apk-16kb/resolved-aars.json
+    native-provenance: app/build/reports/apk-16kb/native-provenance.json
+```
+
+The option reports origins for all packaged native libraries. It verifies the
+APK and AAR manifest hashes first. For a changed library, the APK entry hash
+must equal the strip output hash, and the merged input hash must match the
+corresponding AAR entry. The JSON marks that method as `gradle_strip_chain`
+and includes `merged_sha256` alongside the APK entry's `sha256`. With no usable
+chain, the report uses `direct_sha256`. If the APK or manifest hash differs,
+the report labels the mismatch and uses direct matching. A verified chain
+with zero or several AAR matches keeps its `unknown` or `multiple_candidates`
+status. The evidence describes a trusted local Gradle build, and the candidate
+list is limited to the supplied resolved external AARs.
+
+If ELF passes and ZIP fails, check APK packaging and alignment. Candidate coordinates list
+matching AAR entries.
 
 ## Package and verify an SDK handoff
 

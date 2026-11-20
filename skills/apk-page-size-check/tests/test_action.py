@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import runpy
@@ -33,11 +34,12 @@ class GithubAction(unittest.TestCase):
             for name, payload in entries:
                 archive.writestr(name, payload)
 
-    def run_action(self, apk=None, manifest="", expected_exit=0):
+    def run_action(self, apk=None, manifest="", expected_exit=0, provenance=""):
         environment = {
             **os.environ,
             "INPUT_APK": str(apk if apk is not None else self.apk.name),
             "INPUT_AAR_MANIFEST": str(manifest),
+            "INPUT_NATIVE_PROVENANCE": str(provenance),
             "GITHUB_WORKSPACE": str(self.workspace),
             "RUNNER_TEMP": str(self.runner),
             "GITHUB_STEP_SUMMARY": str(self.summary),
@@ -78,6 +80,39 @@ class GithubAction(unittest.TestCase):
                       "example:first:1.0", "example:second:1.0", "libchanged.so"):
             self.assertIn(value, summary)
         self.assertIn("supplied AAR", summary)
+
+    def test_strip_evidence_survives_zip_only_failure_and_is_explained_in_summary(self):
+        stripped = elf()
+        merged = stripped + b"debug symbols"
+        with ZipFile(self.apk, "w") as archive:
+            archive.writestr("AndroidManifest.xml", "fixture")
+            archive.writestr(ARM, stripped)
+        aar = self.workspace / "source.aar"
+        with ZipFile(aar, "w") as archive:
+            archive.writestr("AndroidManifest.xml", "fixture")
+            archive.writestr("jni/" + ARM[4:], merged)
+        manifest = self.workspace / "aars.json"
+        manifest.write_text(json.dumps({
+            "consumer_configuration": ":app:debugRuntimeClasspath",
+            "artifacts": [{"coordinate": "example:source:1", "path": aar.name}],
+        }), encoding="utf-8")
+        provenance = self.workspace / "native provenance.json"
+        provenance.write_text(json.dumps({
+            "variant": "debug",
+            "apk_sha256": hashlib.sha256(self.apk.read_bytes()).hexdigest(),
+            "aar_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            "libraries": {ARM: {
+                "merged_sha256": hashlib.sha256(merged).hexdigest(),
+                "stripped_sha256": hashlib.sha256(stripped).hexdigest(),
+            }},
+        }), encoding="utf-8")
+        _, report, summary = self.run_action(manifest=manifest.name, provenance=provenance.name, expected_exit=1)
+        library = report["libraries"][0]
+        self.assertEqual((library["elf"], library["zip"]), ("pass", "fail"))
+        self.assertEqual(library["origin"]["method"], "gradle_strip_chain")
+        self.assertIn("example:source:1", summary)
+        self.assertIn("gradle_strip_chain", summary)
+        self.assertIn("APK packaging", summary)
 
     def test_failure_without_manifest_requests_aar_list(self):
         self.fixture([(ARM, elf(alignment=4096))])

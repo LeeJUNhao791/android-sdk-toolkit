@@ -1,0 +1,110 @@
+name: MediaPipe APK strip provenance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/mediapipe-strip-provenance.yml'
+      - 'action.yml'
+      - 'skills/apk-page-size-check/scripts/**'
+      - 'skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mediapipe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SAMPLE: mediapipe-samples/examples/image_classification/android
+      EVIDENCE: mediapipe-samples/examples/image_classification/android/app/build/reports/apk-16kb
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check out the pinned MediaPipe sample
+        uses: actions/checkout@v7
+        with:
+          repository: google-ai-edge/mediapipe-samples
+          ref: 46d60d66baf21ae91977c488ea0875f0e13c4d2b
+          path: mediapipe-samples
+          sparse-checkout: |
+            examples/image_classification/android
+            android-common
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK and NDK
+        run: |
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973"
+      - name: Verify models, build the Debug APK and export native provenance
+        id: build
+        working-directory: ${{ env.SAMPLE }}
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache --init-script \
+            "$GITHUB_WORKSPACE/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" \
+            :app:verifyModels :app:exportDebugNativeProvenance :android-common:testing:testDebugUnitTest
+      - name: Check the MediaPipe APK
+        id: alignment
+        uses: ./
+        continue-on-error: true
+        with:
+          apk: ${{ env.SAMPLE }}/app/build/outputs/apk/debug/app-debug.apk
+          aar-manifest: ${{ env.EVIDENCE }}/resolved-aars.json
+          native-provenance: ${{ env.EVIDENCE }}/native-provenance.json
+      - name: Verify the Action result and all four stripped MediaPipe libraries
+        env:
+          ACTION_OUTCOME: ${{ steps.alignment.outcome }}
+          STATUS: ${{ steps.alignment.outputs.status }}
+          CHECKER_EXIT: ${{ steps.alignment.outputs.exit-code }}
+          REPORT: ${{ steps.alignment.outputs.report }}
+        run: |
+          test "$ACTION_OUTCOME" = success
+          test "$STATUS" = pass
+          test "$CHECKER_EXIT" = 0
+          test -s "$REPORT"
+
+          apk="$GITHUB_WORKSPACE/$SAMPLE/app/build/outputs/apk/debug/app-debug.apk"
+          python -B skills/apk-page-size-check/scripts/check_apk.py \
+            "$apk" \
+            --aar-manifest "$GITHUB_WORKSPACE/$EVIDENCE/resolved-aars.json" \
+            --native-provenance "$GITHUB_WORKSPACE/$EVIDENCE/native-provenance.json" \
+            > "$RUNNER_TEMP/cli-report.json"
+          cmp "$REPORT" "$RUNNER_TEMP/cli-report.json"
+
+          python -B - "$REPORT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert report["status"] == "pass", report["status"]
+          provenance = report["native_provenance"]
+          assert (provenance["variant"], provenance["status"]) == ("debug", "verified"), provenance
+          libraries = {row["entry"]: row for row in report["libraries"]}
+          for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64"):
+              entry = f"lib/{abi}/libmediapipe_tasks_jni.so"
+              origin = libraries[entry]["origin"]
+              assert origin["method"] == "gradle_strip_chain", (entry, origin)
+              assert origin["status"] == "single_candidate", (entry, origin)
+              assert [candidate["coordinate"] for candidate in origin["candidates"]] == [
+                  "com.google.mediapipe:tasks-core:1.2.2"
+              ], (entry, origin)
+              print(f"{entry}: verified strip chain to tasks-core:1.2.2")
+          PY
+          "${ANDROID_HOME}/build-tools/36.0.0/zipalign" -c -P 16 4 "$apk"
+      - name: Save the checker reports and Gradle evidence
+        if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: mediapipe-strip-provenance
+          path: |
+            ${{ steps.alignment.outputs.report }}
+            ${{ runner.temp }}/cli-report.json
+            ${{ env.EVIDENCE }}/resolved-aars.json
+            ${{ env.EVIDENCE }}/native-provenance.json
+          if-no-files-found: error

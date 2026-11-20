@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -81,16 +82,20 @@ def read_to_end(stream):
         pass
 
 
-def entry_sha256(archive, entry):
+def stream_sha256(stream):
     digest = hashlib.sha256()
-    with archive.open(entry) as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
+    for block in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(block)
     return digest.hexdigest()
 
 
-def load_aar_manifest(path):
-    manifest = json.loads(path.read_text(encoding="utf-8-sig"))
+def entry_sha256(archive, entry):
+    with archive.open(entry) as stream:
+        return stream_sha256(stream)
+
+
+def load_aar_manifest(path, content):
+    manifest = json.loads(content.decode("utf-8-sig"))
     if not isinstance(manifest, dict) or set(manifest) != {"consumer_configuration", "artifacts"}:
         raise ValueError("Expected consumer_configuration and artifacts in the AAR manifest.")
     configuration = manifest["consumer_configuration"]
@@ -142,19 +147,76 @@ def find_aar_origins(artifacts, apk_digests):
     return candidates
 
 
-def annotate_origins(report, manifest_path, digests):
-    configuration, artifacts = load_aar_manifest(manifest_path)
-    candidates = find_aar_origins(artifacts, digests)
+def load_native_provenance(path, apk_sha256, manifest_sha256):
+    def unique_keys(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate native provenance key: " + key)
+            result[key] = value
+        return result
+
+    evidence = json.loads(path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique_keys)
+    if not isinstance(evidence, dict) or set(evidence) != {
+            "variant", "apk_sha256", "aar_manifest_sha256", "libraries"}:
+        raise ValueError("Expected variant, APK hash, AAR manifest hash and libraries in native provenance.")
+
+    def is_hash(value):
+        return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+
+    variant = evidence["variant"]
+    if not isinstance(variant, str) or not variant.strip():
+        raise ValueError("Expected a native provenance variant.")
+    if not all(is_hash(evidence[field]) for field in ("apk_sha256", "aar_manifest_sha256")):
+        raise ValueError("Expected lowercase SHA-256 digests in native provenance.")
+    libraries = evidence["libraries"]
+    if not isinstance(libraries, dict):
+        raise ValueError("Expected native provenance libraries indexed by APK entry.")
+    for entry, hashes in libraries.items():
+        if (not re.fullmatch(r"lib/[^/]+/[^/]+[.]so", entry) or not isinstance(hashes, dict)
+                or set(hashes) != {"merged_sha256", "stripped_sha256"}
+                or not all(is_hash(value) for value in hashes.values())):
+            raise ValueError("Invalid native provenance entry: " + entry)
+
+    status = "verified"
+    if evidence["apk_sha256"] != apk_sha256:
+        status = "apk_mismatch"
+    elif evidence["aar_manifest_sha256"] != manifest_sha256:
+        status = "aar_manifest_mismatch"
+    return {"path": str(path), "variant": variant, "status": status}, libraries if status == "verified" else {}
+
+
+def annotate_origins(report, manifest_path, digests, provenance_path=None, apk_sha256=None):
+    manifest = manifest_path.read_bytes()
+    configuration, artifacts = load_aar_manifest(manifest_path, manifest)
     report["aar_manifest"] = {"path": str(manifest_path), "consumer_configuration": configuration}
+    lookup_digests = dict(digests)
+    strip_chains = {}
+    if provenance_path is not None:
+        report["native_provenance"], libraries = load_native_provenance(
+            provenance_path, apk_sha256, hashlib.sha256(manifest).hexdigest(),
+        )
+        for entry, digest in digests.items():
+            hashes = libraries.get(entry)
+            if hashes and hashes["stripped_sha256"] == digest and hashes["merged_sha256"] != digest:
+                # Once the strip chain matches, a direct byte match can refer to a different AAR.
+                strip_chains[entry] = hashes["merged_sha256"]
+        lookup_digests.update(strip_chains)
+
+    candidates = find_aar_origins(artifacts, lookup_digests)
     statuses = {0: "unknown", 1: "single_candidate"}
     for library in report["libraries"]:
         entry = library["entry"]
-        if entry in candidates:
-            matches = candidates[entry]
-            library["origin"] = {
-                "status": statuses.get(len(matches), "multiple_candidates"),
-                "sha256": digests[entry], "candidates": matches,
-            }
+        if entry not in candidates:
+            continue
+        matches = candidates[entry]
+        origin = {"status": statuses.get(len(matches), "multiple_candidates"),
+                  "sha256": digests[entry], "candidates": matches}
+        if provenance_path is not None:
+            origin["method"] = "direct_sha256"
+            if entry in strip_chains:
+                origin.update(method="gradle_strip_chain", merged_sha256=strip_chains[entry])
+        library["origin"] = origin
 
 
 def check_library(apk, archive, entry, abi):
@@ -185,10 +247,14 @@ def check_library(apk, archive, entry, abi):
     return result
 
 
-def check_apk(path, libraries, digests=None):
+def check_apk(path, libraries, digests=None, with_provenance=False):
     if path.suffix.lower() != ".apk":
         raise ValueError("Input must be an .apk file.")
+    apk_sha256 = None
     with path.open("rb") as apk, ZipFile(apk) as archive:
+        if with_provenance:
+            apk.seek(0)
+            apk_sha256 = stream_sha256(apk)
         entries = archive.infolist()
         manifest = [entry for entry in entries if entry.filename == "AndroidManifest.xml"]
         if len(manifest) != 1 or not manifest[0].file_size:
@@ -207,29 +273,35 @@ def check_apk(path, libraries, digests=None):
                 continue
             result = check_library(apk, archive, entry, parts[1])
             libraries.append(result)
-            if digests is not None and "fail" in (result["elf"], result["zip"]):
+            checks = (result["elf"], result["zip"])
+            if digests is not None and "invalid" not in checks and (with_provenance or "fail" in checks):
                 digests[entry.filename] = entry_sha256(archive, entry)
 
     if any("invalid" in (item["elf"], item["zip"]) for item in libraries):
-        return "invalid"
+        return "invalid", apk_sha256
     if any("fail" in (item["elf"], item["zip"]) for item in libraries):
-        return "fail"
+        return "fail", apk_sha256
     if not any(item["abi"] in ELF64_MACHINES for item in libraries):
-        return "not_applicable"
-    return "pass"
+        return "not_applicable", apk_sha256
+    return "pass", apk_sha256
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
     parser.add_argument("--aar-manifest", type=Path, help="JSON list of resolved consumer AARs and coordinates.")
+    parser.add_argument("--native-provenance", type=Path, help="Same-build Gradle APK and native library hashes.")
     args = parser.parse_args()
     report = {"apk": str(args.apk), "page_size": PAGE_SIZE, "libraries": []}
     digests = {} if args.aar_manifest is not None else None
     try:
-        report["status"] = check_apk(args.apk, report["libraries"], digests)
+        if args.native_provenance is not None and args.aar_manifest is None:
+            raise ValueError("--native-provenance requires --aar-manifest.")
+        report["status"], apk_sha256 = check_apk(
+            args.apk, report["libraries"], digests, with_provenance=args.native_provenance is not None,
+        )
         if args.aar_manifest is not None and report["status"] != "invalid":
-            annotate_origins(report, args.aar_manifest, digests)
+            annotate_origins(report, args.aar_manifest, digests, args.native_provenance, apk_sha256)
     except INPUT_ERRORS as error:
         report.update(status="invalid", error=str(error))
     if report["status"] == "not_applicable":

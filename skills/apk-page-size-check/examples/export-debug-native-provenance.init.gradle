@@ -1,0 +1,74 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import java.security.MessageDigest
+
+String sha256(File file) {
+    def digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[64 * 1024]
+        int count
+        while ((count = stream.read(buffer)) != -1) {
+            digest.update(buffer, 0, count)
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+gradle.beforeProject { project ->
+    if (project.path != ':app') {
+        return
+    }
+    project.pluginManager.withPlugin('com.android.application') {
+        project.tasks.register('exportDebugNativeProvenance') {
+            group = 'verification'
+            description = 'Build the Debug APK and record native library and dependency hashes.'
+            dependsOn 'assembleDebug'
+            doLast {
+                def build = project.layout.buildDirectory
+                def output = build.dir('outputs/apk/debug').get().asFile
+                def metadata = new JsonSlurper().parse(new File(output, 'output-metadata.json'))
+                if (metadata.variantName != 'debug' || metadata.elements.size() != 1) {
+                    throw new GradleException('Expected one APK from the Debug variant.')
+                }
+                def apk = new File(output, metadata.elements[0].outputFile)
+                def strip = project.tasks.named('stripDebugDebugSymbols').get()
+                def merged = strip.inputDir.get().asFile
+                def stripped = strip.outputDir.get().asFile
+                def hashes = [:]
+                project.fileTree(merged).matching { include 'lib/*/*.so' }.files.sort().each { library ->
+                    def entry = merged.toPath().relativize(library.toPath()).toString().replace(File.separator, '/')
+                    def result = new File(stripped, entry)
+                    if (result.isFile()) {
+                        hashes[entry] = [merged_sha256: sha256(library), stripped_sha256: sha256(result)]
+                    }
+                }
+
+                def runtime = project.configurations.getByName('debugRuntimeClasspath')
+                def external = runtime.incoming.artifactView {
+                    componentFilter { component -> component instanceof ModuleComponentIdentifier }
+                }
+                def artifacts = external.artifacts.artifacts.findAll {
+                    it.file.name.endsWith('.aar')
+                }.collect {
+                    def module = it.id.componentIdentifier
+                    [coordinate: "${module.group}:${module.module}:${module.version}".toString(),
+                     path: it.file.absolutePath]
+                }.sort { left, right -> (left.coordinate <=> right.coordinate) ?: (left.path <=> right.path) }
+
+                def directory = build.dir('reports/apk-16kb').get().asFile
+                directory.mkdirs()
+                def manifest = new File(directory, 'resolved-aars.json')
+                manifest.setText(JsonOutput.prettyPrint(JsonOutput.toJson([
+                    consumer_configuration: "${project.path}:${runtime.name}".toString(), artifacts: artifacts
+                ])) + '\n', 'UTF-8')
+                def evidence = new File(directory, 'native-provenance.json')
+                evidence.setText(JsonOutput.prettyPrint(JsonOutput.toJson([
+                    variant: 'debug', apk_sha256: sha256(apk),
+                    aar_manifest_sha256: sha256(manifest), libraries: hashes
+                ])) + '\n', 'UTF-8')
+                logger.lifecycle("Exported ${artifacts.size()} resolved AARs and ${hashes.size()} native library hash pairs")
+            }
+        }
+    }
+}
