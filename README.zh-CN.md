@@ -38,7 +38,7 @@ python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk
 ```yaml
 - name: Check APK 16 KB alignment
   id: alignment
-  uses: LeeJUNhao791/android-sdk-toolkit@v0.7.0
+  uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
   with:
     apk: app/build/outputs/apk/release/app-release.apk
     # 可选，传入已解析的 AAR 清单
@@ -49,6 +49,20 @@ Action 将检查结果写入 Job Summary，通过 `status`、`exit-code` 和 `re
 
 - **WebRTC**。实际 Gradle APK 通过了检查。人为改变 ZIP 数据偏移的对照 APK 失败，报告列出 WebRTC AAR 候选。 [构建与检查步骤](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/3101b54c63e57b06234448f50ee22e73b882451c/examples/apk-16kb-action/README.md#check-a-gradle-built-apk-with-a-third-party-sdk) · [APK 检查作业](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100/job/135383913161) · [运行摘要和报告](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44472134100)
 - **MediaPipe**。上游 Image Classification 示例的 Debug APK 通过。Gradle 剥离符号前的合并产物与传递依赖 `com.google.mediapipe:tasks-core:1.2.2` 的 AAR 内容匹配。 [构建与检查步骤](https://github.com/LeeJUNhao791/android-delivery-workflows/blob/d5f43e846744f53d0c8a90260dd32b217bf8b935/examples/apk-16kb-action/README.md#check-the-upstream-mediapipe-image-classification-apk) · [CI 证据](https://github.com/LeeJUNhao791/android-delivery-workflows/actions/runs/44480978736)
+
+### 追溯剥离符号后的原生库
+
+Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体未配置 `productFlavor`。从 `v0.8.0` 取出导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。 [Gradle 导出命令](README.md#trace-a-stripped-library-from-the-same-gradle-build)
+
+```yaml
+- uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
+  with:
+    apk: app/build/outputs/apk/debug/app-debug.apk
+    aar-manifest: app/build/reports/apk-16kb/resolved-aars.json
+    native-provenance: app/build/reports/apk-16kb/native-provenance.json
+```
+
+`report` 指向包含 AAR 候选的 JSON。Job Summary 显示对齐状态和候选坐标。
 
 ## 其他交付工具
 
