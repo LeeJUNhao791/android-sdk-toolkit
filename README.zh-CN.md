@@ -2,6 +2,10 @@
 
 [English](README.md)
 
+[![main 分支 SDK Toolkit CI](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml)
+[![最新版本](https://img.shields.io/github/v/release/LeeJUNhao791/android-sdk-toolkit)](https://github.com/LeeJUNhao791/android-sdk-toolkit/releases/latest)
+[![MIT 许可证](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 用于交付和集成 Android SDK 的命令行工具。可以检查 APK 的 16 KB 对齐、从已解析的 AAR 中查找出问题的原生库、验证 AAR 交付约定，以及诊断 JNI 加载问题。脚本也可以作为 [Agent Skills](skills) 使用。
 
 ## 检查最终 APK 的 16 KB 对齐
@@ -76,4 +80,4 @@ Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体�
 
 ## 许可证
 
-[MIT](LICENSE)
+[贡献指南](CONTRIBUTING.md) · [MIT](LICENSE)
