@@ -50,7 +50,7 @@ jobs:
             :app:verifyModels :app:exportDebugNativeProvenance :android-common:testing:testDebugUnitTest
       - name: Check the MediaPipe APK
         id: alignment
-        uses: ./
+        uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
         continue-on-error: true
         with:
           apk: ${{ env.SAMPLE }}/app/build/outputs/apk/debug/app-debug.apk

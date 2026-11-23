@@ -2,6 +2,10 @@
 
 [简体中文](README.zh-CN.md)
 
+[![SDK Toolkit CI on main](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/LeeJUNhao791/android-sdk-toolkit)](https://github.com/LeeJUNhao791/android-sdk-toolkit/releases/latest)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Small command-line tools and Agent Skills for delivering and integrating Android SDKs.
 
 ## AAR delivery check
@@ -375,4 +379,4 @@ python -B -m unittest discover -s tests -v
 
 ## License
 
-[MIT](LICENSE)
+[Contributing](CONTRIBUTING.md) · [MIT](LICENSE)
