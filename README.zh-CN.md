@@ -18,6 +18,8 @@ python skills/apk-page-size-check/scripts/check_apk.py app.apk
 
 工具会检查 ARM64 和 x86-64 原生库的 ELF `PT_LOAD` 段和未压缩原生库在 APK 中的 ZIP 数据偏移。JSON 报告给出未对齐的条目和对应数值。拆分交付时，请对每个实际分发的 APK 分别执行检查。退出码 `0` 表示检查通过，`1` 表示对齐失败，`2` 表示输入无效或不受支持，`3` 表示 APK 没有 64 位库且无 ZIP 对齐错误。需要确认 16 KB 环境下的安装和 JNI 调用时，请在实际页大小为 `16384` 的设备或模拟器上验证。 [真机验证步骤](README.md#verify-the-aar-on-an-android-device)
 
+通过 [16 KB 对齐故障排查](docs/16kb-troubleshooting.zh-CN.md) 修复 ELF 或 ZIP 对齐问题，并用 WebRTC 示例追溯失败库的 AAR 版本。
+
 ### 查找出问题的 .so 所在的候选 AAR
 
 导出实际构建 APK 的模块和 variant 的 Gradle 运行时 AAR 清单，包含传递依赖。清单记录 `consumer_configuration` 和 `artifacts`，后者的每一项包含已解析的 Maven 坐标 `coordinate` 和文件路径 `path`。相对路径以清单所在目录为基准。 [清单示例和 Gradle 导出方法](README.md#find-candidate-aars-for-failing-native-libraries)

@@ -135,6 +135,10 @@ JNI execution on a 16 KB Android system require separate checks. See
 [Android's 16 KB page size guide](https://developer.android.com/guide/practices/page-sizes)
 and the [runtime procedure below](#verify-the-aar-on-an-android-device).
 
+Use the [16 KB troubleshooting guide](docs/16kb-troubleshooting.md) to fix
+ELF or ZIP failures and follow a WebRTC example that traces a failing library
+to its AAR version.
+
 ### Use the GitHub Action
 
 After building the final APK in your workflow, add this step. The action sets
