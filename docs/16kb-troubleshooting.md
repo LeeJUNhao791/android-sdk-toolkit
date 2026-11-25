@@ -53,6 +53,27 @@ ARM64 ELF and ZIP layout. Use your app build and runtime tests to evaluate an
 SDK upgrade.
 [WebRTC 104.5112.10](https://repo.maven.apache.org/maven2/io/github/webrtc-sdk/android/104.5112.10/) · [WebRTC 150.7871.01](https://repo.maven.apache.org/maven2/io/github/webrtc-sdk/android/150.7871.01/)
 
+## Draft a report for a supplier
+
+Save the checker JSON and run the local report command with Python 3.8+.
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py app.apk --aar-manifest resolved-aars.json > apk-16kb.json
+python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json -o vendor-report.md
+```
+
+The checker saves JSON even when alignment fails (exit code `1`). The report
+command exits `0` after writing a draft and `2` if the JSON has unusable
+alignment results or the output cannot be written. Omit `-o` to write UTF-8
+Markdown to standard output. With `-o`, choose a new file.
+
+Review the draft before sharing. A single byte match covers the AARs in the
+supplied manifest. For a verified same-build strip chain, check ELF alignment
+on the matched AAR member itself before contacting the supplier. Collect more
+provenance when multiple or no candidates match. Route ZIP alignment failures
+to app packaging. The draft includes SO digests where available. Compute the
+full AAR digest separately if a supplier requests it.
+
 ## Reproduce the WebRTC comparison
 
 Use Python 3.8+, JDK 17 (`JAVA_HOME`), Android SDK Platform 35 and Build Tools

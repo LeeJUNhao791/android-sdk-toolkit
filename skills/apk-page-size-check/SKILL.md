@@ -39,6 +39,9 @@ status and each origin method. A verified strip chain matches the APK entry
 to the strip task result and the merged input to AAR candidates. ZIP failure
 guidance applies to APK packaging.
 
+Use the [bilingual report command](../../docs/16kb-troubleshooting.md#draft-a-report-for-a-supplier)
+to turn an existing checker JSON into a local Markdown draft for review.
+
 Run on each APK delivered to the device when using split APKs. This check covers
 native alignment in the supplied APK. Assess GNU_RELRO layout separately and
 verify installation and JNI execution on a device or emulator where
