@@ -27,3 +27,23 @@ apksigner verify app-release.apk
 ## 复现 WebRTC 对照结果
 
 准备 Python 3.8+、JDK 17（设置 `JAVA_HOME`）、Android SDK Platform 35 和 Build Tools 36.0.0（设置 `ANDROID_HOME`）。在仓库根目录按英文版的共用步骤运行，会从 Maven Central 下载两个固定版本的 AAR，生成并签名两个最小检查 APK。分别运行检查命令，旧版退出码为 `1`，且只有该版本一个候选。新版退出码为 `0`，`elf` 和 `zip` 均为 `pass`。 [复制复现脚本与检查命令](16kb-troubleshooting.md#reproduce-the-webrtc-comparison)
+
+## 生成双语供应商沟通稿
+
+保存检查器的 JSON，使用 Python 3.8 或更高版本生成本地 Markdown 草稿。
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py app.apk --aar-manifest resolved-aars.json > apk-16kb.json
+python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json -o vendor-report.md
+```
+
+对齐失败时，检查器仍会输出 JSON，并返回退出码 `1`。生成草稿成功时返回 `0`。JSON
+缺少可用检查结果或输出无法写入时返回 `2`。省略 `-o` 会将 UTF-8 Markdown 写入标准输出。
+使用 `-o` 时请指定一个新文件。
+
+分享前请复核草稿。唯一匹配的范围是所提供清单中的 AAR。对于剥离符号的库，在检查器命令中加入
+`--native-provenance native-provenance.json`，使用同次构建的溯源证据。符号剥离链通过验证时，
+先复查匹配的 AAR 条目的 ELF 对齐。若该条目也失败，联系供应商。若通过，检查符号剥离和后续打包。
+候选缺失或存在多个匹配时，先补充溯源证据。
+ZIP 对齐失败由应用打包侧处理。草稿会列出可用的 SO 摘要。如果供应商需要完整 AAR 的摘要，
+请单独计算。
