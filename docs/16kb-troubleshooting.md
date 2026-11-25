@@ -68,11 +68,14 @@ alignment results or the output cannot be written. Omit `-o` to write UTF-8
 Markdown to standard output. With `-o`, choose a new file.
 
 Review the draft before sharing. A single byte match covers the AARs in the
-supplied manifest. For a verified same-build strip chain, check ELF alignment
-on the matched AAR member itself before contacting the supplier. Collect more
-provenance when multiple or no candidates match. Route ZIP alignment failures
-to app packaging. The draft includes SO digests where available. Compute the
-full AAR digest separately if a supplier requests it.
+supplied manifest. For stripped libraries, add
+`--native-provenance native-provenance.json` to the checker command using evidence
+from the same build. If the strip chain is verified, check the matched AAR
+member's ELF alignment. Contact the supplier if that member also fails.
+If it passes, investigate stripping and packaging. Collect more provenance
+when multiple or no candidates match. Route ZIP alignment failures to app
+packaging. The draft includes SO digests where available. Compute the full
+AAR digest separately if a supplier requests it.
 
 ## Reproduce the WebRTC comparison
 

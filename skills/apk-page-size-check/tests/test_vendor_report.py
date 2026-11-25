@@ -72,6 +72,11 @@ class VendorReport(unittest.TestCase):
         )
         report = self.render(data)
         self.assertIn("verified same-build Gradle strip chain", report)
+        self.assertIn("Verify AAR ELF", report)
+        self.assertIn("复查 AAR ELF", report)
+        self.assertIn("If that member also fails", report)
+        self.assertIn("If it passes, investigate stripping and packaging", report)
+        self.assertNotIn("Supplier follow-up", report)
         self.assertIn("APK SO SHA-256", report)
         self.assertIn("Pre-strip SO SHA-256", report)
         self.assertIn(APK_SO_SHA, report)
@@ -85,6 +90,23 @@ class VendorReport(unittest.TestCase):
         self.assertIn("More evidence needed", report)
         self.assertNotIn(COORDINATE, report)
         self.assertNotIn(MERGED_SO_SHA, report)
+
+    def test_strip_chain_metadata_cannot_be_reported_as_a_direct_match(self):
+        data = checker_report()
+        data["native_provenance"] = {"status": "verified"}
+        library = data["libraries"][0]
+        origin = library["origin"]
+        for extra in ({"merged_sha256": MERGED_SO_SHA},
+                      {"method": "direct_sha256", "merged_sha256": MERGED_SO_SHA}, {}):
+            with self.subTest(extra=extra):
+                library["origin"] = {**origin, **extra}
+                report = self.render(data)
+                self.assertIn("More evidence needed", report)
+                self.assertNotIn("direct SHA-256", report)
+                self.assertNotIn(COORDINATE, report)
+
+        library["origin"] = {**origin, "method": "direct_sha256"}
+        self.assertIn("Supplier follow-up", self.render(data))
 
     def test_zip_only_points_to_packaging_even_with_candidate(self):
         report = self.render(checker_report(elf="pass", zip_result="fail"))
@@ -142,7 +164,19 @@ class VendorReport(unittest.TestCase):
                 self.assertIn("More evidence needed", report)
                 for fragment in ("private.invalid", "secret", "relative"):
                     self.assertNotIn(fragment, report)
+        fake_token = "ghp_" + "A" * 36
+        candidate["coordinate"] = "example.vendor:sdk:" + fake_token
+        report = self.render(data)
+        self.assertIn("More evidence needed", report)
+        self.assertNotIn(fake_token, report)
+
         candidate["coordinate"] = COORDINATE
+        library["entry"] = f"lib/arm64-v8a/lib{fake_token}.so"
+        candidate["entry"] = f"jni/arm64-v8a/lib{fake_token}.so"
+        report = self.render(data)
+        self.assertIn("More evidence needed", report)
+        self.assertNotIn(fake_token, report)
+
         library["entry"] = "lib/arm64-v8a/../../private/key.so"
         candidate["entry"] = "jni/arm64-v8a/../../private/key.so"
         origin["sha256"] = chr(96) + "\n<script>secret</script>"

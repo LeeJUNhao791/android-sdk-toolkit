@@ -12,10 +12,12 @@ from check_apk import ABI32, ELF64_MACHINES, PAGE_SIZE
 
 COORDINATE = r"(?![A-Za-z]:)[A-Za-z0-9][A-Za-z0-9_.-]*:[A-Za-z0-9][A-Za-z0-9_.-]*:[A-Za-z0-9][A-Za-z0-9_.+-]*"
 SHA256 = r"[0-9a-f]{64}"
+GITHUB_TOKEN = r"gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{36,}"
 
 
 def safe_text(value, pattern):
-    return isinstance(value, str) and re.fullmatch(pattern, value) is not None
+    return (isinstance(value, str) and re.fullmatch(pattern, value) is not None
+            and re.search(GITHUB_TOKEN, value) is None)
 
 
 def uint64(value):
@@ -24,7 +26,7 @@ def uint64(value):
     return value
 
 
-def elf_follow_up(origin, apk_entry, provenance_verified, evidence):
+def elf_follow_up(origin, apk_entry, provenance, evidence):
     status = origin.get("status")
     matches = origin.get("candidates")
     digest = origin.get("sha256")
@@ -36,29 +38,37 @@ def elf_follow_up(origin, apk_entry, provenance_verified, evidence):
     if isinstance(candidate, dict) and apk_entry and safe_text(digest, SHA256):
         member = "jni/" + apk_entry[4:]
         coordinate = candidate.get("coordinate")
-        method = origin.get("method", "direct_sha256")
+        method = origin.get("method")
         merged = origin.get("merged_sha256")
-        strip_chain = (method == "gradle_strip_chain" and provenance_verified
+        direct_match = ("merged_sha256" not in origin
+                        and (method == "direct_sha256" or ("method" not in origin and provenance is None)))
+        strip_chain = (method == "gradle_strip_chain" and isinstance(provenance, dict)
+                       and provenance.get("status") == "verified"
                        and safe_text(merged, SHA256) and merged != digest)
         if (candidate.get("entry") == member and safe_text(coordinate, COORDINATE)
-                and (method == "direct_sha256" or strip_chain)):
-            if strip_chain:
-                evidence.append(f"- Pre-strip SO SHA-256 / 剥离符号前 SO SHA-256 `{merged}`")
-                basis_zh = "检查器验证了同一次 Gradle 构建的符号剥离链，并用剥离前的 SO 匹配 AAR 条目。请先复核该 AAR 内 SO 的 ELF 对齐。"
-                basis_en = ("The checker's verified same-build Gradle strip chain matched the pre-strip SO to the AAR member. "
-                            "First check ELF alignment on that AAR member.")
-            else:
-                basis_zh = "APK 内 SO 与 AAR 条目的 SHA-256 一致。"
-                basis_en = "The APK SO matched the AAR member by direct SHA-256."
+                and (direct_match or strip_chain)):
             evidence.extend([
                 f"- Single AAR candidate / 唯一 AAR 候选 `{coordinate}`",
                 f"- AAR member / AAR 条目 `{member}`",
             ])
+            if strip_chain:
+                evidence.append(f"- Pre-strip SO SHA-256 / 剥离符号前 SO SHA-256 `{merged}`")
+                return (
+                    "**复查 AAR ELF**。APK 内 SO 的 16 KB ELF 对齐失败。"
+                    "检查器验证了同一次 Gradle 构建的符号剥离链，并用剥离前的 SO 匹配 AAR 条目。"
+                    "请复查该条目的 ELF 对齐。若也失败，请向供应商索取支持 16 KB ELF 对齐的版本。"
+                    "若通过，请检查符号剥离和后续打包。",
+                    "**Verify AAR ELF.** The APK SO failed 16 KB ELF alignment. The checker's verified same-build "
+                    "Gradle strip chain matched the pre-strip SO to the AAR member. Check that member's ELF alignment. "
+                    "If that member also fails, ask the supplier for a 16 KB-aligned version. "
+                    "If it passes, investigate stripping and packaging.",
+                )
             return (
-                f"**供应商跟进**。16 KB ELF 对齐失败。在所提供的 AAR 中找到一个候选。{basis_zh}"
-                "请确认支持 16 KB ELF 对齐的版本，或提供重编译的 AAR。",
-                f"**Supplier follow-up.** 16 KB ELF alignment failed. One candidate matched among the supplied AARs. "
-                f"{basis_en} Please confirm a supported version with 16 KB ELF alignment or provide a rebuilt AAR.",
+                "**供应商跟进**。16 KB ELF 对齐失败。在所提供的 AAR 中找到一个候选。"
+                "APK 内 SO 与 AAR 条目的 SHA-256 一致。请确认支持 16 KB ELF 对齐的版本，或提供重编译的 AAR。",
+                "**Supplier follow-up.** 16 KB ELF alignment failed. One candidate matched among the supplied AARs. "
+                "The APK SO matched the AAR member by direct SHA-256. "
+                "Please confirm a supported version with 16 KB ELF alignment or provide a rebuilt AAR.",
             )
 
     if status == "multiple_candidates":
@@ -78,7 +88,6 @@ def render(report):
     if report["page_size"] != PAGE_SIZE or not isinstance(report["libraries"], list):
         raise ValueError
     provenance = report.get("native_provenance")
-    provenance_verified = isinstance(provenance, dict) and provenance.get("status") == "verified"
     zh, en, evidence = [], [], []
     failed = has_64_bit = False
     for library in report["libraries"]:
@@ -110,7 +119,7 @@ def render(report):
                                 f"`p_align={align}, p_offset={offset}, p_vaddr={vaddr}`")
             origin = library.get("origin")
             zh_action, en_action = elf_follow_up(
-                origin if isinstance(origin, dict) else {}, entry, provenance_verified, evidence,
+                origin if isinstance(origin, dict) else {}, entry, provenance, evidence,
             )
             zh.append(f"- {label} {zh_action}")
             en.append(f"- {label} {en_action}")
