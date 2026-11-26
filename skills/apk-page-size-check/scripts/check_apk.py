@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import re
+import runpy
 import struct
 import sys
 from pathlib import Path
@@ -328,11 +329,11 @@ def main():
                     "Review the error and collected results in `report.json`.\n"
                 )
             else:
-                from render_vendor_report import render
+                render = runpy.run_path(str(Path(__file__).with_name("render_vendor_report.py")))["render"]
                 markdown = render(report)
             with (args.output_dir / "report.md").open("x", encoding="utf-8") as stream:
                 stream.write(markdown)
-        except (KeyError, OSError, RecursionError, TypeError, ValueError):
+        except (ImportError, KeyError, OSError, RecursionError, SyntaxError, TypeError, ValueError):
             print("Could not finish evidence files. Scanner JSON remains on stdout; "
                   "keep any files in the output directory. Evidence generation returned exit 2.", file=sys.stderr)
             return 2

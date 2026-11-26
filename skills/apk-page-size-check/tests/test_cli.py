@@ -124,6 +124,42 @@ class ApkPageSizeCheck(unittest.TestCase):
         self.assertIn("new output directory", result.stderr)
         self.assertEqual({path.name: path.read_bytes() for path in directory.iterdir()}, before)
 
+    def test_isolated_output_directory_preserves_success_and_not_applicable(self):
+        for code, entries in ((0, ((ARM, elf(), ZIP_DEFLATED, None),)), (3, ())):
+            with self.subTest(code=code):
+                self.fixture(*entries)
+                command = [sys.executable, "-I", str(SCRIPT), str(self.apk)]
+                baseline = subprocess.run(command, capture_output=True)
+                directory = self.apk.parent / ("isolated evidence " + str(code))
+                result = subprocess.run([*command, "--output-dir", str(directory)], capture_output=True)
+                self.assertEqual(result.returncode, code, result.stderr)
+                self.assertEqual((result.returncode, result.stdout), (baseline.returncode, baseline.stdout))
+                self.assertEqual(json.loads((directory / "report.json").read_bytes()), json.loads(result.stdout))
+                self.assertIn("## English", (directory / "report.md").read_text(encoding="utf-8"))
+                self.assertEqual(result.stderr, b"")
+
+    def test_missing_or_unloadable_renderer_preserves_scan_and_returns_error(self):
+        self.fixture((ARM, elf(), ZIP_DEFLATED, None))
+        bundle = self.apk.parent / "bundled scripts"
+        bundle.mkdir()
+        checker = bundle / SCRIPT.name
+        checker.write_bytes(SCRIPT.read_bytes())
+        for index, source in enumerate((None, "import missing_renderer_dependency\n", "invalid Python !\n")):
+            with self.subTest(source=source):
+                if source is not None:
+                    (bundle / "render_vendor_report.py").write_text(source, encoding="utf-8")
+                directory = self.apk.parent / ("unavailable renderer " + str(index))
+                result = subprocess.run(
+                    [sys.executable, "-I", str(checker), str(self.apk), "--output-dir", str(directory)],
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["status"], "pass")
+                self.assertEqual(json.loads((directory / "report.json").read_bytes()), json.loads(result.stdout))
+                self.assertFalse((directory / "report.md").exists())
+                self.assertIn(b"evidence", result.stderr)
+                self.assertNotIn(b"Traceback", result.stderr)
+
     def test_partial_evidence_write_preserves_scan_and_returns_error(self):
         self.fixture((ARM, elf(), ZIP_DEFLATED, None))
         original_open = Path.open
@@ -142,7 +178,6 @@ class ApkPageSizeCheck(unittest.TestCase):
 
                 output, errors = io.StringIO(), io.StringIO()
                 with mock.patch.object(sys, "argv", [str(SCRIPT), str(self.apk), "--output-dir", str(directory)]), \
-                        mock.patch.object(sys, "path", [str(SCRIPT.parent), *sys.path]), \
                         mock.patch.object(Path, "open", open_file), \
                         contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
                     code = entrypoint()
