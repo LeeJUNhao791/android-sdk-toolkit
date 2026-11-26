@@ -8,6 +8,10 @@
 
 用于交付和集成 Android SDK 的命令行工具。可以检查 APK 的 16 KB 对齐、从已解析的 AAR 中查找出问题的原生库、验证 AAR 交付约定，以及诊断 JNI 加载问题。脚本也可以作为 [Agent Skills](skills) 使用。
 
+![MediaPipe APK 实际静态检查：8 项 ELF、16 项 ZIP 检查通过，并生成 JSON 与双语 Markdown](docs/assets/toolkit-demo.png)
+
+2026-11-26 对真实 MediaPipe 调试 APK 执行后，将实际输出制作成静态可视化。安装和 JNI 运行需单独验证。[复现命令与输入哈希](docs/assets/demo.md)。
+
 ## 检查最终 APK 的 16 KB 对齐
 
 安装 Python 3.8 或更新版本，在仓库根目录运行下列命令。检查 APK 或 AAR 不需要安装 Android SDK。

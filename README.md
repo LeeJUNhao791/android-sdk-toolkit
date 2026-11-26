@@ -8,6 +8,10 @@
 
 Small command-line tools and Agent Skills for delivering and integrating Android SDKs.
 
+![Actual MediaPipe APK check: 8 ELF and 16 ZIP checks pass; JSON and bilingual Markdown generated](docs/assets/toolkit-demo.png)
+
+Actual output visualization from a real MediaPipe debug APK, captured on 2026-11-26. Static alignment checks; installation and JNI execution require separate tests. [Reproduce the run and check the input hash](docs/assets/demo.md).
+
 ## AAR delivery check
 
 Find missing files before handing an AAR to another team. For example, an AAR
