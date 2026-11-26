@@ -8,6 +8,10 @@
 
 用于交付和集成 Android SDK 的命令行工具。可以检查 APK 的 16 KB 对齐、从已解析的 AAR 中查找出问题的原生库、验证 AAR 交付约定，以及诊断 JNI 加载问题。脚本也可以作为 [Agent Skills](skills) 使用。
 
+![MediaPipe APK 实际静态检查：8 项 ELF、16 项 ZIP 检查通过，并生成 JSON 与双语 Markdown](docs/assets/toolkit-demo.png)
+
+2026-11-26 对真实 MediaPipe 调试 APK 执行后，将实际输出制作成静态可视化。安装和 JNI 运行需单独验证。[复现命令与输入哈希](docs/assets/demo.md)。
+
 ## 检查最终 APK 的 16 KB 对齐
 
 安装 Python 3.8 或更新版本，在仓库根目录运行下列命令。检查 APK 或 AAR 不需要安装 Android SDK。
@@ -44,7 +48,7 @@ python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk
 ```yaml
 - name: Check APK 16 KB alignment
   id: alignment
-  uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
+  uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0
   with:
     apk: app/build/outputs/apk/release/app-release.apk
     # 可选，传入已解析的 AAR 清单
@@ -58,10 +62,10 @@ Action 将检查结果写入 Job Summary，通过 `status`、`exit-code` 和 `re
 
 ### 追溯剥离符号后的原生库
 
-Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体未配置 `productFlavor`。从 `v0.9.0` 取出导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。 [Gradle 导出命令](README.md#trace-a-stripped-library-from-the-same-gradle-build)
+Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体未配置 `productFlavor`。从 `v0.10.0` 取出导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。 [Gradle 导出命令](README.md#trace-a-stripped-library-from-the-same-gradle-build)
 
 ```yaml
-- uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
+- uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0
   with:
     apk: app/build/outputs/apk/debug/app-debug.apk
     aar-manifest: app/build/reports/apk-16kb/resolved-aars.json
