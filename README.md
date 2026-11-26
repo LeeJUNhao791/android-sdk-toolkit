@@ -253,13 +253,13 @@ python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk
 
 ### Trace a stripped library from the same Gradle build
 
-For an Android app at `:app` with an unflavored `debug` variant and one APK, the
+For an Android application module with one APK per selected variant, the
 [native provenance example](skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle)
-builds the APK and writes both inputs under `app/build/reports/apk-16kb/`. It
-uses the strip task's input and output directories. This example was verified
-with the pinned MediaPipe sample and AGP 8.13.2. Set `TOOLKIT` to an absolute
-path to this checkout. Run from the Android project's Gradle root. In PowerShell
-use the Gradle batch wrapper and set `$env:TOOLKIT` to the checkout path.
+builds the APK and writes the resolved AAR manifest and native provenance JSON.
+It defaults to `:app` and `debug`, preserving the original command and
+`app/build/reports/apk-16kb/` paths below. Set `TOOLKIT` to an absolute path to
+this checkout. Run from the Android project's Gradle root. In PowerShell use
+the Gradle batch wrapper and set `$env:TOOLKIT` to the checkout path.
 
 ```sh
 ./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" :app:exportDebugNativeProvenance
@@ -268,8 +268,41 @@ python "$TOOLKIT/skills/apk-page-size-check/scripts/check_apk.py" app/build/outp
   --native-provenance app/build/reports/apk-16kb/native-provenance.json
 ```
 
+To select another application module in the invoked main build and an exact
+enabled AGP variant name, including product flavors, use the generic task from the current checkout
+(these options are not in the `v0.10.0` exporter):
+
+```sh
+./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" \
+  -PtoolkitProvenanceModule=:mobile -PtoolkitProvenanceVariant=demoRelease :mobile:exportNativeProvenance
+```
+
+The properties default to `:app` and `debug`; use module `:` for an application
+at the Gradle root. The task must belong to the selected module.
+`exportDebugNativeProvenance` is available only when the
+selected variant is exactly `debug`. Unknown modules, non-application modules,
+unknown or disabled variants, and multiple APK outputs fail without falling
+back to another module or variant. Split APK export is unsupported.
+
+Both JSON files are written under the selected module's Gradle build directory:
+`reports/apk-16kb/` for `debug`, or `reports/apk-16kb/<variant>/` otherwise.
+For the example above, the default build directory gives
+`mobile/build/reports/apk-16kb/demoRelease/`. The APK comes from AGP's artifact
+provider, and AARs come from that same variant's runtime configuration. Use the
+APK path printed by the exporter with those two sidecars in `check_apk.py`.
+Module, Debug/Release and flavor selection were verified with AGP 8.13.1;
+the original Debug flow was also verified with the pinned MediaPipe sample and
+AGP 8.13.2. The strip task's input/output directories are internal AGP details,
+so other AGP versions need separate verification.
+
+Treat these files as the current export only after Gradle succeeds. On entering
+the export task, its previous two JSON files are removed before validation.
+If assembly fails before export runs, historical files may remain; they do not
+prove that failed build. The checker verifies APK and manifest hashes, not the
+time of a Gradle invocation.
+
 In a workflow, use the Gradle exporter from the `v0.10.0` checkout. Pass both
-files to the published action in the job that built the Debug APK.
+files to the published action in the job that built the original `:app` Debug APK.
 
 ```yaml
 - uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0

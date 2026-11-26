@@ -62,7 +62,26 @@ Action 将检查结果写入 Job Summary，通过 `status`、`exit-code` 和 `re
 
 ### 追溯剥离符号后的原生库
 
-Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体未配置 `productFlavor`。从 `v0.10.0` 取出导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。 [Gradle 导出命令](README.md#trace-a-stripped-library-from-the-same-gradle-build)
+Gradle 导出示例默认构建 `:app` 模块的单个 `debug` APK，原命令和 `app/build/reports/apk-16kb/` 输出位置保持兼容。将 `TOOLKIT` 设为当前仓库的绝对路径，从 Android 项目的 Gradle 根目录运行。PowerShell 使用 `gradlew.bat` 和 `$env:TOOLKIT`。 [完整说明](README.md#trace-a-stripped-library-from-the-same-gradle-build)
+
+```sh
+./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" :app:exportDebugNativeProvenance
+```
+
+当前仓库的导出脚本还可指定所调用主构建内的应用模块，以及包含 `productFlavor` 的精确 AGP 变体名；这些新参数尚未包含在 `v0.10.0` 导出脚本中：
+
+```sh
+./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" \
+  -PtoolkitProvenanceModule=:mobile -PtoolkitProvenanceVariant=demoRelease :mobile:exportNativeProvenance
+```
+
+两个参数默认分别为 `:app` 和 `debug`；Gradle 根项目本身是应用时，模块参数使用 `:`。任务必须属于所选模块。只有变体恰为 `debug` 时才提供兼容入口 `exportDebugNativeProvenance`。模块不存在、模块不是 Android application、变体不存在或被禁用、一次输出多个 APK 时均失败，不会改用其他模块或变体；本轮不支持 split APK 导出。
+
+两个 JSON 写到所选模块的 Gradle build 目录下：`debug` 使用 `reports/apk-16kb/`，其他变体使用 `reports/apk-16kb/<variant>/`。上例在默认 build 目录下写到 `mobile/build/reports/apk-16kb/demoRelease/`。APK 取自 AGP artifact provider，AAR 清单取自同一变体的运行时配置。将导出时打印的 APK 路径及这两个文件一起交给 `check_apk.py`。模块、Debug/Release 和 flavor 选择已用 AGP 8.13.1 验证；原 Debug 流程也用固定版本 MediaPipe 示例和 AGP 8.13.2 验证。读取 strip 任务输入/输出目录仍依赖 AGP 内部实现，其他 AGP 版本需另行验证。
+
+只有 Gradle 成功才可将这些文件视为本次导出。导出任务开始执行时会先删除本变体的两个旧 JSON，再验证并生成新文件。如果 assemble 在导出任务执行前失败，可能保留历史文件，它们不能证明这次失败的构建。检查器核对 APK 和清单哈希，不核对 Gradle 调用时间。
+
+原 `:app` Debug 流程可继续使用 `v0.10.0` 的脚本。在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。
 
 ```yaml
 - uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0
