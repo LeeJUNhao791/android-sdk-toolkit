@@ -151,7 +151,7 @@ up Python 3.11 and writes a Markdown table to the job summary.
 ```yaml
 - name: Check APK 16 KB alignment
   id: alignment
-  uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
+  uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0
   with:
     apk: app/build/outputs/apk/release/app-release.apk
     # Optional, using the resolved AAR manifest described below:
@@ -268,11 +268,11 @@ python "$TOOLKIT/skills/apk-page-size-check/scripts/check_apk.py" app/build/outp
   --native-provenance app/build/reports/apk-16kb/native-provenance.json
 ```
 
-In a workflow, use the Gradle exporter from the `v0.9.0` checkout. Pass both
+In a workflow, use the Gradle exporter from the `v0.10.0` checkout. Pass both
 files to the published action in the job that built the Debug APK.
 
 ```yaml
-- uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
+- uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0
   with:
     apk: app/build/outputs/apk/debug/app-debug.apk
     aar-manifest: app/build/reports/apk-16kb/resolved-aars.json
