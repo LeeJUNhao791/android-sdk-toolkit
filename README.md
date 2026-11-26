@@ -291,6 +291,23 @@ matching AAR entries.
 
 ### Draft a bilingual supplier report
 
+To scan a final APK and save both JSON and a bilingual Markdown draft in one
+command:
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py "app with spaces.apk" --aar-manifest resolved-aars.json --native-provenance native-provenance.json --output-dir "build/apk evidence/run-1"
+```
+
+The sidecar flags are optional; `--native-provenance` requires `--aar-manifest`.
+The output directory must be new, including on retries. It receives UTF-8
+`report.json` and `report.md`; stdout remains the scanner JSON. Invalid inputs
+produce JSON and an explicit invalid-input Markdown note. Successful evidence
+generation preserves scanner exits `0`, `1`, `2`, and `3`. A directory or report
+generation error returns `2` with stderr; if scanning already finished, its
+JSON status remains on stdout and any written evidence is retained. Check the
+command exit and stderr as well as the JSON status before treating the evidence
+generation as complete.
+
 Save the checker JSON, then turn it into an English and Simplified Chinese
 Markdown draft. Run the commands separately: an alignment failure returns
 exit `1` and still writes JSON.

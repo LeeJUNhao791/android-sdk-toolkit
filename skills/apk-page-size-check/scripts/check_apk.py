@@ -291,7 +291,14 @@ def main():
     parser.add_argument("apk", type=Path)
     parser.add_argument("--aar-manifest", type=Path, help="JSON list of resolved consumer AARs and coordinates.")
     parser.add_argument("--native-provenance", type=Path, help="Same-build Gradle APK and native library hashes.")
+    parser.add_argument("--output-dir", type=Path, help="New directory for report.json and bilingual report.md.")
     args = parser.parse_args()
+    if args.output_dir is not None:
+        try:
+            args.output_dir.mkdir(parents=True)
+        except OSError:
+            print("Could not create evidence directory. Choose a writable, new output directory.", file=sys.stderr)
+            return 2
     report = {"apk": str(args.apk), "page_size": PAGE_SIZE, "libraries": []}
     digests = {} if args.aar_manifest is not None else None
     try:
@@ -306,7 +313,29 @@ def main():
         report.update(status="invalid", error=str(error))
     if report["status"] == "not_applicable":
         report["detail"] = "No arm64-v8a or x86_64 shared libraries in this APK."
-    print(json.dumps(report, indent=2))
+    document = json.dumps(report, indent=2)
+    print(document)
+    if args.output_dir is not None:
+        try:
+            with (args.output_dir / "report.json").open("x", encoding="utf-8") as stream:
+                stream.write(document + "\n")
+            if report["status"] == "invalid":
+                markdown = (
+                    "# Android 16 KB alignment / Android 16 KB 对齐\n\n"
+                    "Result / 结果: **invalid** (scanner exit / 扫描退出码 `2`).\n\n"
+                    "输入无效，无法给出完整的对齐结论。请查看 `report.json` 中的错误和已收集结果。\n\n"
+                    "Invalid input; no complete alignment conclusion is available. "
+                    "Review the error and collected results in `report.json`.\n"
+                )
+            else:
+                from render_vendor_report import render
+                markdown = render(report)
+            with (args.output_dir / "report.md").open("x", encoding="utf-8") as stream:
+                stream.write(markdown)
+        except (KeyError, OSError, RecursionError, TypeError, ValueError):
+            print("Could not finish evidence files. Scanner JSON remains on stdout; "
+                  "keep any files in the output directory. Evidence generation returned exit 2.", file=sys.stderr)
+            return 2
     return EXIT_CODES[report["status"]]
 
 
