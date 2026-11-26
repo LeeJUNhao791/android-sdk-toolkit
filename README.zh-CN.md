@@ -72,6 +72,14 @@ Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体�
 
 ### 生成双语供应商沟通稿
 
+也可用一条命令扫描最终 APK，并保存 JSON 和中英文 Markdown 草稿：
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py "app with spaces.apk" --aar-manifest resolved-aars.json --native-provenance native-provenance.json --output-dir "build/apk evidence/run-1"
+```
+
+两个附加清单参数均可省略；使用 `--native-provenance` 时必须同时提供 `--aar-manifest`。输出目录必须尚不存在，重试时也要使用新目录。命令将 UTF-8 的 `report.json` 和 `report.md` 写入该目录，标准输出仍为扫描 JSON。输入无效时也会保存 JSON 和明确标注输入无效的 Markdown。证据生成完成后，保留扫描退出码 `0`、`1`、`2`、`3`；目录创建或报告生成出错时返回 `2`，并写出错误提示。若扫描已完成，标准输出中的 JSON 状态和已写出的文件都会保留。因此应同时核对命令退出码、错误提示和 JSON 状态，确认本次证据是否完整生成。
+
 保存检查器 JSON，再生成中英文 Markdown 草稿。请分别执行两条命令：对齐失败时，第一条返回退出码 `1`，仍会写出 JSON。
 
 ```sh

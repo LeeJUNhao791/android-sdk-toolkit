@@ -1,11 +1,15 @@
+import contextlib
 import hashlib
+import io
 import json
+import runpy
 import struct
 import subprocess
 import sys
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
@@ -73,6 +77,116 @@ class ApkPageSizeCheck(unittest.TestCase):
             "artifacts": [{"coordinate": coordinate, "path": str(aar)} for coordinate, aar in artifacts],
         }), encoding="utf-8")
         return path
+
+    def test_output_directory_keeps_scanner_json_and_exit_codes(self):
+        self.apk = self.apk.with_name("app with spaces.apk")
+        for code, status in enumerate(("pass", "fail", "invalid", "not_applicable")):
+            with self.subTest(status=status):
+                if status == "invalid":
+                    self.apk.write_bytes(b"not an APK")
+                elif status == "not_applicable":
+                    self.fixture()
+                else:
+                    self.fixture((ARM, elf(alignment=4096 if code else 16384), ZIP_DEFLATED, None))
+                original = self.apk.read_bytes()
+                directory = self.apk.parent / ("evidence with spaces " + status)
+                report = self.report(code, status, "--output-dir", directory)
+                self.assertEqual(json.loads((directory / "report.json").read_bytes()), report)
+                markdown = (directory / "report.md").read_text(encoding="utf-8")
+                if status == "invalid":
+                    self.assertIn("invalid", markdown)
+                    self.assertIn("report.json", markdown)
+                else:
+                    self.assertIn("## English", markdown)
+                self.assertEqual(self.apk.read_bytes(), original)
+
+    def test_output_directory_keeps_invalid_sidecar_evidence(self):
+        self.fixture((ARM, elf(alignment=4096), ZIP_DEFLATED, None))
+        manifest = self.apk.with_name("missing aars.json")
+        directory = self.apk.parent / "missing sidecar evidence"
+        report = self.report(2, "invalid", "--aar-manifest", manifest, "--output-dir", directory)
+        self.assertIn("error", report)
+        self.assertEqual(json.loads((directory / "report.json").read_bytes()), report)
+        self.assertIn("invalid", (directory / "report.md").read_text(encoding="utf-8"))
+        self.assertFalse(manifest.exists())
+
+    def test_output_directory_retry_preserves_all_existing_content(self):
+        self.fixture((ARM, elf(), ZIP_DEFLATED, None))
+        directory = self.apk.parent / "evidence"
+        self.report(0, "pass", "--output-dir", directory)
+        before = {path.name: path.read_bytes() for path in directory.iterdir()}
+        self.fixture((ARM, elf(alignment=4096), ZIP_DEFLATED, None))
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(self.apk), "--output-dir", str(directory)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("new output directory", result.stderr)
+        self.assertEqual({path.name: path.read_bytes() for path in directory.iterdir()}, before)
+
+    def test_isolated_output_directory_preserves_success_and_not_applicable(self):
+        for code, entries in ((0, ((ARM, elf(), ZIP_DEFLATED, None),)), (3, ())):
+            with self.subTest(code=code):
+                self.fixture(*entries)
+                command = [sys.executable, "-I", str(SCRIPT), str(self.apk)]
+                baseline = subprocess.run(command, capture_output=True)
+                directory = self.apk.parent / ("isolated evidence " + str(code))
+                result = subprocess.run([*command, "--output-dir", str(directory)], capture_output=True)
+                self.assertEqual(result.returncode, code, result.stderr)
+                self.assertEqual((result.returncode, result.stdout), (baseline.returncode, baseline.stdout))
+                self.assertEqual(json.loads((directory / "report.json").read_bytes()), json.loads(result.stdout))
+                self.assertIn("## English", (directory / "report.md").read_text(encoding="utf-8"))
+                self.assertEqual(result.stderr, b"")
+
+    def test_missing_or_unloadable_renderer_preserves_scan_and_returns_error(self):
+        self.fixture((ARM, elf(), ZIP_DEFLATED, None))
+        bundle = self.apk.parent / "bundled scripts"
+        bundle.mkdir()
+        checker = bundle / SCRIPT.name
+        checker.write_bytes(SCRIPT.read_bytes())
+        for index, source in enumerate((None, "import missing_renderer_dependency\n", "invalid Python !\n")):
+            with self.subTest(source=source):
+                if source is not None:
+                    (bundle / "render_vendor_report.py").write_text(source, encoding="utf-8")
+                directory = self.apk.parent / ("unavailable renderer " + str(index))
+                result = subprocess.run(
+                    [sys.executable, "-I", str(checker), str(self.apk), "--output-dir", str(directory)],
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["status"], "pass")
+                self.assertEqual(json.loads((directory / "report.json").read_bytes()), json.loads(result.stdout))
+                self.assertFalse((directory / "report.md").exists())
+                self.assertIn(b"evidence", result.stderr)
+                self.assertNotIn(b"Traceback", result.stderr)
+
+    def test_partial_evidence_write_preserves_scan_and_returns_error(self):
+        self.fixture((ARM, elf(), ZIP_DEFLATED, None))
+        original_open = Path.open
+        entrypoint = runpy.run_path(str(SCRIPT))["main"]
+        for filename in ("report.json", "report.md"):
+            with self.subTest(filename=filename):
+                directory = self.apk.parent / ("partial evidence " + filename)
+
+                @contextlib.contextmanager
+                def open_file(path, *args, **kwargs):
+                    with original_open(path, *args, **kwargs) as stream:
+                        if path == directory / filename:
+                            stream.write("partial evidence")
+                            raise OSError("Evidence write failed")
+                        yield stream
+
+                output, errors = io.StringIO(), io.StringIO()
+                with mock.patch.object(sys, "argv", [str(SCRIPT), str(self.apk), "--output-dir", str(directory)]), \
+                        mock.patch.object(Path, "open", open_file), \
+                        contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+                    code = entrypoint()
+                self.assertEqual(code, 2)
+                self.assertEqual(json.loads(output.getvalue())["status"], "pass")
+                if filename == "report.md":
+                    self.assertEqual(json.loads((directory / "report.json").read_bytes())["status"], "pass")
+                self.assertEqual((directory / filename).read_text(encoding="utf-8"), "partial evidence")
+                self.assertIn("evidence", errors.getvalue())
 
     def test_stored_and_compressed_libraries_pass_with_explicit_32_bit_scope(self):
         self.fixture(

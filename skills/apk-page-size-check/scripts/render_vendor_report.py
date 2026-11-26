@@ -4,10 +4,14 @@
 import argparse
 import json
 import re
+import runpy
 import sys
 from pathlib import Path
 
-from check_apk import ABI32, ELF64_MACHINES, PAGE_SIZE
+_checker = runpy.run_path(str(Path(__file__).with_name("check_apk.py")))
+ABI32 = _checker["ABI32"]
+ELF64_MACHINES = _checker["ELF64_MACHINES"]
+PAGE_SIZE = _checker["PAGE_SIZE"]
 
 
 COORDINATE = r"(?![A-Za-z]:)[A-Za-z0-9][A-Za-z0-9_.-]*:[A-Za-z0-9][A-Za-z0-9_.-]*:[A-Za-z0-9][A-Za-z0-9_.+-]*"

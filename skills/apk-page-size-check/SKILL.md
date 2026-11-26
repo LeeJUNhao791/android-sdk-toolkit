@@ -41,6 +41,11 @@ guidance applies to APK packaging.
 
 Use the [bilingual report command](../../docs/16kb-troubleshooting.md#draft-a-report-for-a-supplier)
 to turn an existing checker JSON into a local Markdown draft for review.
+Alternatively, add `--output-dir "build/apk evidence/run-1"` to the scan
+command to save `report.json` and a bilingual `report.md` together. The
+directory must be new, including on retries. Invalid input gets an explicit
+invalid-input note. Completed evidence preserves scanner exits 0/1/2/3;
+directory or report errors return 2 with stderr and retain any scan evidence.
 
 Run on each APK delivered to the device when using split APKs. This check covers
 native alignment in the supplied APK. Assess GNU_RELRO layout separately and
