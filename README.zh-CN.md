@@ -44,7 +44,7 @@ python skills/apk-page-size-check/scripts/check_apk.py build/apk-origins/app.apk
 ```yaml
 - name: Check APK 16 KB alignment
   id: alignment
-  uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
+  uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
   with:
     apk: app/build/outputs/apk/release/app-release.apk
     # 可选，传入已解析的 AAR 清单
@@ -58,10 +58,10 @@ Action 将检查结果写入 Job Summary，通过 `status`、`exit-code` 和 `re
 
 ### 追溯剥离符号后的原生库
 
-Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体未配置 `productFlavor`。从 `v0.8.0` 取出导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。 [Gradle 导出命令](README.md#trace-a-stripped-library-from-the-same-gradle-build)
+Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体未配置 `productFlavor`。从 `v0.9.0` 取出导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。 [Gradle 导出命令](README.md#trace-a-stripped-library-from-the-same-gradle-build)
 
 ```yaml
-- uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
+- uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
   with:
     apk: app/build/outputs/apk/debug/app-debug.apk
     aar-manifest: app/build/reports/apk-16kb/resolved-aars.json
@@ -69,6 +69,20 @@ Gradle 导出示例适用于 `:app` 模块的单个 Debug APK，要求该变体�
 ```
 
 `report` 指向包含 AAR 候选的 JSON。Job Summary 显示对齐状态和候选坐标。
+
+### 生成双语供应商沟通稿
+
+保存检查器 JSON，再生成中英文 Markdown 草稿。请分别执行两条命令：对齐失败时，第一条返回退出码 `1`，仍会写出 JSON。
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py app.apk --aar-manifest resolved-aars.json > apk-16kb.json
+python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json -o vendor-report.md
+```
+
+对于剥离符号的库，在第一条命令中加入同次构建的 `--native-provenance native-provenance.json`。
+对于 ELF 失败项，草稿会列出可用的 APK 内 SO SHA-256。唯一的直接字节匹配会补充 AAR 坐标和条目；若符号剥离链通过验证且只有一个 AAR 候选，还会列出剥离符号前 SO 的 SHA-256。这些摘要标识 SO 内容，不是完整 APK 或 AAR 的摘要。仅 ZIP 失败时，建议由应用打包侧处理。已验证的符号剥离链会先要求复查 AAR 条目的 ELF 对齐，再确定是否需要供应商修复。
+
+请指定一个新输出文件；生成器会保留已有文件。成功写出草稿时返回 `0`，JSON 不可用或输出失败时返回 `2`。分享前请复核；草稿会省略本地路径。16 KB 系统上的安装和 JNI 调用仍需单独验证。 [报告生成说明](docs/16kb-troubleshooting.zh-CN.md#生成双语供应商沟通稿)
 
 ## 其他交付工具
 
