@@ -33,7 +33,7 @@ its origin undetermined.
 
 For a stripped library, pass `--native-provenance native-provenance.json`
 alongside `--aar-manifest`. Use the
-[Gradle Debug exporter](examples/export-debug-native-provenance.init.gradle)
+[Gradle module/variant exporter](examples/export-debug-native-provenance.init.gradle)
 to capture both files from the same build. Check the report's provenance
 status and each origin method. A verified strip chain matches the APK entry
 to the strip task result and the merged input to AAR candidates. ZIP failure

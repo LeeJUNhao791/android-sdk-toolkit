@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ PUBLISH = ROOT / "skills/android-sdk-pack/scripts/publish_sdk.py"
 GROUP = "io.github.leejunhao791.sdktoolkit"
 AAR_COORDINATE = f"{GROUP}:device-sdk:0.1.0"
 JAR_COORDINATE = f"{GROUP}:java-device-sdk:0.1.0"
+PROVENANCE = ROOT / "skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle"
 
 
 class HandoffIntegration(unittest.TestCase):
@@ -192,3 +194,133 @@ android {
         accepted = self.run_tool(*args, "--consumer-task", ":app:assembleDemoDebug")
         self.assertIn(":app:assembleDemoDebug (demoDebugRuntimeClasspath)", accepted.stderr)
         self.assertTrue(json.loads(accepted.stdout)["consumer_artifact_verified"])
+
+    def test_native_provenance_accepts_a_root_application_module(self):
+        repository = self.output / "repository"
+        self.run_tool(
+            PUBLISH, "examples/android-sdk", "examples/consumers/android", "--kind", "aar",
+            "--coordinate", AAR_COORDINATE, "--output", repository,
+        )
+        wrapper = ROOT / "examples/android-sdk" / ("gradlew.bat" if sys.platform == "win32" else "gradlew")
+        consumer = ROOT / "examples/consumers/android"
+        result = subprocess.run(
+            [str(wrapper), "--no-configuration-cache", "--init-script", str(PROVENANCE),
+             f"-PtoolkitRepo={repository}", f"-PtoolkitCoordinate={AAR_COORDINATE}",
+             "-PtoolkitProvenanceModule=:", ":exportNativeProvenance"],
+            cwd=consumer, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=360,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+        manifest = consumer / "build/reports/apk-16kb/resolved-aars.json"
+        self.assertEqual(json.loads(manifest.read_text(encoding="utf-8"))["consumer_configuration"],
+                         ":debugRuntimeClasspath")
+
+    def test_native_provenance_selects_the_application_module_and_exact_variant(self):
+        repository = self.output / "repository"
+        self.run_tool(
+            PUBLISH, "examples/android-sdk", "examples/consumers/android", "--kind", "aar",
+            "--coordinate", AAR_COORDINATE, "--output", repository,
+        )
+        consumer = self.output / "consumer"
+        consumer.mkdir()
+        settings = (ROOT / "examples/consumers/android/settings.gradle").read_text(encoding="utf-8")
+        (consumer / "settings.gradle").write_text(
+            settings + "\ninclude 'app', 'mobile', 'helper'\nincludeBuild 'build-logic'\n", encoding="utf-8",
+        )
+        for auxiliary in ("buildSrc", "build-logic"):
+            (consumer / auxiliary).mkdir()
+        (consumer / "buildSrc/build.gradle").write_text("plugins { id 'java' }\n", encoding="utf-8")
+        (consumer / "build-logic/settings.gradle").write_text("rootProject.name = 'build-logic'\n", encoding="utf-8")
+        (consumer / "build-logic/build.gradle").write_text("tasks.register('ping')\n", encoding="utf-8")
+        (consumer / "build.gradle").write_text(
+            "tasks.register('checkBuildLogic') { dependsOn gradle.includedBuild('build-logic').task(':ping') }\n",
+            encoding="utf-8",
+        )
+        for module in ("app", "mobile", "helper"):
+            manifest = consumer / module / "src/main/AndroidManifest.xml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text("<manifest />\n", encoding="utf-8")
+            plugin = "library" if module == "helper" else "application"
+            build = (
+                f"plugins {{ id 'com.android.{plugin}' version '8.13.1' }}\n"
+                f"android {{ namespace 'demo.provenance.{module}'; compileSdk 35; "
+                "defaultConfig { minSdk 23 } }\n"
+            )
+            if module == "mobile":
+                build += (
+                    "layout.buildDirectory = file('../../build space')\n"
+                    "android { flavorDimensions 'edition'; productFlavors {\n"
+                    "    plain { dimension 'edition' }; demo { dimension 'edition' } } }\n"
+                    "dependencies { demoImplementation providers.gradleProperty('toolkitCoordinate').get() }\n"
+                )
+            else:
+                build += "dependencies { implementation providers.gradleProperty('toolkitCoordinate').get() }\n"
+            (consumer / module / "build.gradle").write_text(build, encoding="utf-8")
+
+        wrapper = ROOT / "examples/android-sdk" / ("gradlew.bat" if sys.platform == "win32" else "gradlew")
+
+        def export(task, *properties, expected=0):
+            result = subprocess.run(
+                [str(wrapper), "--no-configuration-cache", "--init-script", str(PROVENANCE),
+                 f"-PtoolkitRepo={repository}", f"-PtoolkitCoordinate={AAR_COORDINATE}",
+                 *properties, task, ":checkBuildLogic"], cwd=consumer, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=360,
+            )
+            if expected == 0:
+                self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+                self.assertIn(":build-logic:ping", result.stdout)
+            else:
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+            return result
+
+        for module, variant, task in (
+            ("app", "debug", ":app:exportDebugNativeProvenance"),
+            ("app", "release", ":app:exportNativeProvenance"),
+            ("mobile", "demoDebug", ":mobile:exportNativeProvenance"),
+            ("mobile", "demoRelease", ":mobile:exportNativeProvenance"),
+            ("mobile", "plainRelease", ":mobile:exportNativeProvenance"),
+        ):
+            with self.subTest(module=module, variant=variant):
+                properties = () if variant == "debug" else (
+                    f"-PtoolkitProvenanceModule=:{module}", f"-PtoolkitProvenanceVariant={variant}",
+                )
+                export(task, *properties)
+                build = self.output / "build space" if module == "mobile" else consumer / module / "build"
+                directory = build / "reports/apk-16kb" / ("" if variant == "debug" else variant)
+                manifest = directory / "resolved-aars.json"
+                provenance = directory / "native-provenance.json"
+                evidence = json.loads(provenance.read_text(encoding="utf-8"))
+                aars = json.loads(manifest.read_text(encoding="utf-8"))
+                self.assertEqual(evidence["variant"], variant)
+                self.assertEqual(aars["consumer_configuration"], f":{module}:{variant}RuntimeClasspath")
+                self.assertEqual(evidence["aar_manifest_sha256"], hashlib.sha256(manifest.read_bytes()).hexdigest())
+                coordinates = [item["coordinate"] for item in aars["artifacts"]]
+                self.assertEqual(coordinates, [] if variant == "plainRelease" else [AAR_COORDINATE])
+                apk = next(path for path in build.glob("outputs/apk/**/*.apk")
+                           if hashlib.sha256(path.read_bytes()).hexdigest() == evidence["apk_sha256"])
+                self.assertEqual(len(evidence["libraries"]), 0 if variant == "plainRelease" else 2)
+                checked = self.run_tool(
+                    APK_CHECK, apk, "--aar-manifest", manifest, "--native-provenance", provenance,
+                    expected=3 if variant == "plainRelease" else 0,
+                )
+                report = json.loads(checked.stdout)
+                self.assertEqual(report["native_provenance"]["status"], "verified")
+
+        for module, variant, task in (
+            (":missing", "debug", ":missing:exportNativeProvenance"),
+            (":helper", "debug", ":helper:exportNativeProvenance"),
+            (":mobile", "Debug", ":mobile:exportNativeProvenance"),
+            (":mobile", "demoRelease", ":mobile:exportDebugNativeProvenance"),
+            (":mobile", "demoRelease", ":app:exportNativeProvenance"),
+        ):
+            with self.subTest(rejected_module=module, rejected_variant=variant, task=task):
+                export(task, f"-PtoolkitProvenanceModule={module}",
+                       f"-PtoolkitProvenanceVariant={variant}", expected=1)
+
+        app_build = consumer / "app/build.gradle"
+        with app_build.open("a", encoding="utf-8") as build:
+            build.write("android { splits { abi { enable true; reset(); include 'arm64-v8a', 'x86_64'; universalApk false } } }\n")
+        rejected = export(":app:exportDebugNativeProvenance", expected=1)
+        self.assertIn("Expected one APK", rejected.stderr)
+        directory = consumer / "app/build/reports/apk-16kb"
+        self.assertFalse((directory / "resolved-aars.json").exists())
+        self.assertFalse((directory / "native-provenance.json").exists())

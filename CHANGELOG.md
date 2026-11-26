@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Extend the same-build native provenance Gradle exporter to select an Android application module and exact Debug/Release or product-flavor variant. Keep the default `:app` Debug command and JSON schemas compatible; isolate other variants' reports and reject multiple APK outputs.
+
 ## [0.10.0] - 2026-11-26
 
 - Add `check_apk.py --output-dir` to save scanner JSON and an English/Simplified Chinese Markdown draft together in a new directory. Successful evidence writes preserve JSON on stdout and scanner exit codes `0`/`1`/`2`/`3`. Existing output paths are refused without overwriting them; evidence generation errors return `2`. [#14](https://github.com/LeeJUNhao791/android-sdk-toolkit/pull/14)
