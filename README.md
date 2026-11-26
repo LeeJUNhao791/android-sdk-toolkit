@@ -147,7 +147,7 @@ up Python 3.11 and writes a Markdown table to the job summary.
 ```yaml
 - name: Check APK 16 KB alignment
   id: alignment
-  uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
+  uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
   with:
     apk: app/build/outputs/apk/release/app-release.apk
     # Optional, using the resolved AAR manifest described below:
@@ -264,11 +264,11 @@ python "$TOOLKIT/skills/apk-page-size-check/scripts/check_apk.py" app/build/outp
   --native-provenance app/build/reports/apk-16kb/native-provenance.json
 ```
 
-In a workflow, use the Gradle exporter from the `v0.8.0` checkout. Pass both
+In a workflow, use the Gradle exporter from the `v0.9.0` checkout. Pass both
 files to the published action in the job that built the Debug APK.
 
 ```yaml
-- uses: LeeJUNhao791/android-sdk-toolkit@v0.8.0
+- uses: LeeJUNhao791/android-sdk-toolkit@v0.9.0
   with:
     apk: app/build/outputs/apk/debug/app-debug.apk
     aar-manifest: app/build/reports/apk-16kb/resolved-aars.json
@@ -288,6 +288,32 @@ list is limited to the supplied resolved external AARs.
 
 If ELF passes and ZIP fails, check APK packaging and alignment. Candidate coordinates list
 matching AAR entries.
+
+### Draft a bilingual supplier report
+
+Save the checker JSON, then turn it into an English and Simplified Chinese
+Markdown draft. Run the commands separately: an alignment failure returns
+exit `1` and still writes JSON.
+
+```sh
+python skills/apk-page-size-check/scripts/check_apk.py app.apk --aar-manifest resolved-aars.json > apk-16kb.json
+python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json -o vendor-report.md
+```
+
+For stripped libraries, add `--native-provenance native-provenance.json` from
+the same build to the first command. For ELF failures, the draft includes the
+available APK SO SHA-256. A single direct byte match adds the AAR coordinate
+and member; a verified strip chain with one AAR candidate also adds the
+pre-strip SO SHA-256. These digests identify SO contents, not the full APK or
+AAR archives. ZIP-only failures point to app packaging. A verified strip chain
+first calls for checking the AAR member's ELF alignment before assigning a
+supplier fix.
+
+Choose a new output file; the renderer preserves existing files. It returns
+`0` for a written draft and `2` for unusable JSON or an output error. Review
+the draft before sharing; local paths are omitted. Installation and JNI
+execution on a 16 KB system require separate verification. See the
+[report guide](docs/16kb-troubleshooting.md#draft-a-report-for-a-supplier).
 
 ## Package and verify an SDK handoff
 
