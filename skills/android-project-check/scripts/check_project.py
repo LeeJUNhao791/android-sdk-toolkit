@@ -208,6 +208,7 @@ def main():
                 raise ValueError("The output directory must be outside the project root.")
             if args.output_dir.exists() or args.output_dir.is_symlink():
                 raise ValueError("Choose a new output directory; existing paths are preserved.")
+            args.output_dir = output
             args.output_dir.mkdir(parents=True)
     except (OSError, ValueError, RuntimeError) as error:
         print("Project check output directory error: " + str(error), file=sys.stderr)

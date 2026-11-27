@@ -212,6 +212,16 @@ class ProjectCheck(unittest.TestCase):
         self.assertFalse((self.root / "new evidence").exists())
         self.assertEqual(self.snapshot(), before)
 
+    def test_parent_segments_in_external_output_do_not_create_project_directories(self):
+        self.aar()
+        before = self.snapshot()
+        directory = self.root / "new" / ".." / ".." / "evidence"
+        report = self.report(0, "pass", "--output-dir", directory)
+        self.assertFalse((self.root / "new").exists())
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(json.loads((self.folder / "evidence/report.json").read_bytes()), report)
+        self.assertTrue((self.folder / "evidence/report.md").is_file())
+
     def symlink(self, path, target, directory=False):
         try:
             path.symlink_to(target, target_is_directory=directory)
@@ -238,6 +248,17 @@ class ProjectCheck(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertIn("output directory", result.stderr)
         self.assertFalse((self.root / "evidence").exists())
+
+    def test_dangling_final_output_symlink_is_preserved(self):
+        self.aar()
+        target = self.folder / "missing evidence"
+        link = self.folder / "output link"
+        self.symlink(link, target, directory=True)
+        result = self.command("--output-dir", link)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertTrue(link.is_symlink())
+        self.assertFalse(target.exists())
 
     @unittest.skipUnless(os.name == "nt", "Windows junction behavior")
     def test_windows_junction_is_not_followed(self):
