@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Add a bounded Android/UTS project AAR inspection pilot with relative paths, SHA-256, opt-in ABI expectations, ELF LOAD alignment, explicit no-match results and optional bilingual supplier drafts. Inputs remain read-only; no Gradle or cache scan is performed.
+## [0.12.0] - 2026-11-27
+
+- Add a bounded Android/UTS project AAR inspection with relative paths, SHA-256, opt-in ABI expectations, ELF LOAD alignment, explicit no-match results and optional bilingual supplier drafts. Inputs remain read-only; no Gradle or cache scan is performed. [#18](https://github.com/LeeJUNhao791/android-sdk-toolkit/pull/18)
 
 ## [0.11.0] - 2026-11-27
 
@@ -25,6 +27,7 @@ These are static APK alignment reports. They do not establish Google Play accept
 
 See [GitHub Releases](https://github.com/LeeJUNhao791/android-sdk-toolkit/releases) for earlier versions.
 
+[0.12.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/releases/tag/v0.9.0

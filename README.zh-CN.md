@@ -115,9 +115,10 @@ python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json 
 
 请指定一个新输出文件；生成器会保留已有文件。成功写出草稿时返回 `0`，JSON 不可用或输出失败时返回 `2`。分享前请复核；草稿会省略本地路径。16 KB 系统上的安装和 JNI 调用仍需单独验证。 [报告生成说明](docs/16kb-troubleshooting.zh-CN.md#生成双语供应商沟通稿)
 
-## 检查项目中已有的 AAR（试点）
+## 检查项目中已有的 AAR
 
-该试点属于当前 `main` 的未发布内容，不包含在 `v0.11.0` 源码归档中。
+从 `v0.12.0` 开始包含在源码归档中。请将 `android-project-check`、
+`aar-delivery-check` 和 `apk-page-size-check` 三个目录一起保留在 `skills/` 下。
 
 只读检查所给项目根目录下的直接文件 `app/libs/*.aar` 和
 `uni_modules/*/utssdk/app-android/libs/*.aar`：

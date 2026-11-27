@@ -82,10 +82,10 @@ directory to use it as a Skill. See the
 [Android AAR documentation](https://developer.android.com/studio/projects/android-library#aar-contents)
 for the archive layout.
 
-## Inspect AARs already present in a project (pilot)
+## Inspect AARs already present in a project
 
-This pilot is unreleased on current `main`; it is not included in the
-`v0.11.0` source archive.
+Included starting with the `v0.12.0` source archive. Keep `android-project-check`,
+`aar-delivery-check` and `apk-page-size-check` together under `skills/`.
 
 Run a read-only check of direct `app/libs/*.aar` and
 `uni_modules/*/utssdk/app-android/libs/*.aar` files in a supplied project root:

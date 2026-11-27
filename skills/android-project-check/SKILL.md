@@ -6,8 +6,9 @@ license: MIT
 
 # Android Project Check
 
-Use this bounded local pilot when AARs are already present in a project. It
-checks direct files in `app/libs/*.aar` and
+Available in the Toolkit source archive starting with `v0.12.0`. Use this
+bounded local check when AARs are already present in a project. It checks
+direct files in `app/libs/*.aar` and
 `uni_modules/*/utssdk/app-android/libs/*.aar` only (`.aar` suffix is case
 insensitive). It does not discover Gradle dependencies, caches, other modules
 or Prefab libraries. Native entry scope is `jni/<abi>/*.so`.
