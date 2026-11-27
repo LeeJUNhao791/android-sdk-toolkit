@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.11.0] - 2026-11-27
 
-- Extend the same-build native provenance Gradle exporter to select an Android application module and exact Debug/Release or product-flavor variant. Keep the default `:app` Debug command and JSON schemas compatible; isolate other variants' reports and reject multiple APK outputs.
+- Extend the same-build native provenance Gradle exporter to select an Android application module and exact Debug/Release or product-flavor variant. Keep the default `:app` Debug command and JSON schemas compatible; isolate other variants' reports and reject multiple APK outputs. [#16](https://github.com/LeeJUNhao791/android-sdk-toolkit/pull/16)
 
 ## [0.10.0] - 2026-11-26
 
@@ -21,5 +21,6 @@ These are static APK alignment reports. They do not establish Google Play accept
 
 See [GitHub Releases](https://github.com/LeeJUNhao791/android-sdk-toolkit/releases) for earlier versions.
 
+[0.11.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/LeeJUNhao791/android-sdk-toolkit/releases/tag/v0.9.0

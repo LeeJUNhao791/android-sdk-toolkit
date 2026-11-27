@@ -268,9 +268,9 @@ python "$TOOLKIT/skills/apk-page-size-check/scripts/check_apk.py" app/build/outp
   --native-provenance app/build/reports/apk-16kb/native-provenance.json
 ```
 
-To select another application module in the invoked main build and an exact
-enabled AGP variant name, including product flavors, use the generic task from the current checkout
-(these options are not in the `v0.10.0` exporter):
+Starting with `v0.11.0`, use the generic task to select another application module
+in the invoked main build and an exact enabled AGP variant name, including
+product flavors. These options are not in the `v0.10.0` exporter:
 
 ```sh
 ./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" \
@@ -301,8 +301,9 @@ If assembly fails before export runs, historical files may remain; they do not
 prove that failed build. The checker verifies APK and manifest hashes, not the
 time of a Gradle invocation.
 
-In a workflow, use the Gradle exporter from the `v0.10.0` checkout. Pass both
-files to the published action in the job that built the original `:app` Debug APK.
+The following workflow stays pinned to `v0.10.0` for the original `:app` Debug
+flow. Use its matching Gradle exporter and pass both files in the job that built
+the APK. Module and variant selection require the `v0.11.0` exporter.
 
 ```yaml
 - uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0

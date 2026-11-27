@@ -68,7 +68,7 @@ Gradle 导出示例默认构建 `:app` 模块的单个 `debug` APK，原命令�
 ./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" :app:exportDebugNativeProvenance
 ```
 
-当前仓库的导出脚本还可指定所调用主构建内的应用模块，以及包含 `productFlavor` 的精确 AGP 变体名；这些新参数尚未包含在 `v0.10.0` 导出脚本中：
+从 `v0.11.0` 开始，可用通用任务指定所调用主构建内的应用模块，以及包含 `productFlavor` 的精确 AGP 变体名；`v0.10.0` 导出脚本不包含这些参数：
 
 ```sh
 ./gradlew --no-configuration-cache --init-script "$TOOLKIT/skills/apk-page-size-check/examples/export-debug-native-provenance.init.gradle" \
@@ -81,7 +81,7 @@ Gradle 导出示例默认构建 `:app` 模块的单个 `debug` APK，原命令�
 
 只有 Gradle 成功才可将这些文件视为本次导出。导出任务开始执行时会先删除本变体的两个旧 JSON，再验证并生成新文件。如果 assemble 在导出任务执行前失败，可能保留历史文件，它们不能证明这次失败的构建。检查器核对 APK 和清单哈希，不核对 Gradle 调用时间。
 
-原 `:app` Debug 流程可继续使用 `v0.10.0` 的脚本。在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。
+下例为原 `:app` Debug 流程固定使用 `v0.10.0`。使用配套版本的 Gradle 导出脚本，在构建 APK 的同一个 job 中生成 AAR 清单和溯源 JSON，再将两个文件交给 Action。模块和变体选择需要 `v0.11.0` 的导出脚本。
 
 ```yaml
 - uses: LeeJUNhao791/android-sdk-toolkit@v0.10.0
