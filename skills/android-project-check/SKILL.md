@@ -35,7 +35,9 @@ JSON uses its own project/AAR schema and sorted relative POSIX source paths.
 It includes AAR and native-member SHA-256, manifest presence, discovered/missing
 ABIs, ABI header status, ELF alignment and failing `PT_LOAD` values. Manifest
 checking means presence/readability, not XML semantics or Android compatibility.
-All file members are streamed to check archive CRC; nothing is extracted.
+Only ZIP Stored/Deflated members are supported; other compression methods
+are invalid and rejected before reading. All file members are streamed to
+check archive CRC; nothing is extracted.
 Duplicate or unsafe ZIP names, invalid archives, absent manifests and invalid
 or unsupported native ELF inputs are invalid. Preserve other AAR results when
 one AAR is invalid.

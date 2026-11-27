@@ -7,7 +7,7 @@ import runpy
 import stat
 import sys
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 
 SKILLS = Path(__file__).resolve().parents[2]
@@ -100,6 +100,8 @@ def check_aar(path, root, expected_abis):
                 seen = set()
                 for entry in entries:
                     name = entry.filename
+                    if entry.compress_type not in (ZIP_STORED, ZIP_DEFLATED):
+                        raise ValueError("Unsupported AAR ZIP compression method: " + name)
                     if (name in seen or "\\" in name or ":" in name.split("/")[0]
                             or any(part in {"", ".", ".."} for part in name.rstrip("/").split("/"))):
                         raise ValueError("Duplicate or unsafe AAR member: " + name)

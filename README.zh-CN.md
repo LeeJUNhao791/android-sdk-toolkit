@@ -117,6 +117,8 @@ python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json 
 
 ## 检查项目中已有的 AAR（试点）
 
+该试点属于当前 `main` 的未发布内容，不包含在 `v0.11.0` 源码归档中。
+
 只读检查所给项目根目录下的直接文件 `app/libs/*.aar` 和
 `uni_modules/*/utssdk/app-android/libs/*.aar`：
 
@@ -134,7 +136,8 @@ JSON 包含稳定的相对来源路径、AAR/SO SHA-256、Manifest 存在情况�
 检查失败、`2` 输入或输出无效、`3` `no_matches`（未找到 AAR，不代表通过）；
 混合结果中输入无效优先。`elf64_count: 0` 明确表示未检查任何 64 位 ELF 对齐。
 Manifest 只检查存在且可读取；AAR ZIP 布局不能证明 APK ZIP 对齐或设备/JNI
-运行行为。[目录检查说明](skills/android-project-check) 列出归档、原生库、路径
+运行行为。ZIP 压缩仅支持 Stored/Deflated，其他方法视为输入无效。
+[目录检查说明](skills/android-project-check/SKILL.md) 列出归档、原生库、路径
 和输出边界。
 
 ## 其他交付工具

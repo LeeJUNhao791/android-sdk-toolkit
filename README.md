@@ -84,6 +84,9 @@ for the archive layout.
 
 ## Inspect AARs already present in a project (pilot)
 
+This pilot is unreleased on current `main`; it is not included in the
+`v0.11.0` source archive.
+
 Run a read-only check of direct `app/libs/*.aar` and
 `uni_modules/*/utssdk/app-android/libs/*.aar` files in a supplied project root:
 
@@ -103,7 +106,8 @@ pass, `1` failed check, `2` invalid input/output and `3` `no_matches` (not a
 pass); invalid input takes precedence in mixed results. `elf64_count: 0`
 explicitly means no 64-bit ELF alignment was evaluated. Manifest checks cover
 presence/readability only; AAR ZIP layout does not establish APK ZIP alignment
-or device/JNI behavior. See the [project check guide](skills/android-project-check)
+or device/JNI behavior. ZIP compression is limited to Stored/Deflated;
+other methods are invalid. See the [project check guide](skills/android-project-check/SKILL.md)
 for archive, native-entry, path and output boundaries.
 
 ## JNI load diagnosis

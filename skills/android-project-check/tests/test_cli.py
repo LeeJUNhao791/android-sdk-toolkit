@@ -165,6 +165,23 @@ class ProjectCheck(unittest.TestCase):
                 archive.writestr("AndroidManifest.xml", "second")
         self.report(2, "invalid")
 
+    def test_malformed_lzma_is_invalid_and_preserves_valid_sibling(self):
+        self.aar("app/libs/a-good.aar")
+        path = self.aar("app/libs/b-lzma.aar", entries={}, compression=ZIP_STORED)
+        with ZipFile(path) as archive:
+            entry = archive.getinfo("AndroidManifest.xml")
+        payload = bytearray(path.read_bytes())
+        payload[8:10] = (14).to_bytes(2, "little")
+        central = payload.index(b"PK\x01\x02")
+        payload[central + 10:central + 12] = (14).to_bytes(2, "little")
+        offset = entry.header_offset + 30 + len(entry.filename)
+        # Invalid LZMA stream without requiring an LZMA compressor in the fixture generator.
+        payload[offset:offset + entry.file_size] = bytes.fromhex("090405005d00008000ffffffffffffff")
+        path.write_bytes(payload)
+        report = self.report(2, "invalid")
+        self.assertEqual([item["status"] for item in report["artifacts"]], ["pass", "invalid"])
+        self.assertIn("Unsupported AAR ZIP compression method", report["artifacts"][1]["errors"][0])
+
     def test_external_output_is_fresh_bilingual_and_input_read_only(self):
         self.aar(entries={ARM: elf(4096)})
         before = self.snapshot()
