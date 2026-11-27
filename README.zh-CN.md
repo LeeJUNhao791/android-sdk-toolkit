@@ -115,6 +115,28 @@ python skills/apk-page-size-check/scripts/render_vendor_report.py apk-16kb.json 
 
 请指定一个新输出文件；生成器会保留已有文件。成功写出草稿时返回 `0`，JSON 不可用或输出失败时返回 `2`。分享前请复核；草稿会省略本地路径。16 KB 系统上的安装和 JNI 调用仍需单独验证。 [报告生成说明](docs/16kb-troubleshooting.zh-CN.md#生成双语供应商沟通稿)
 
+## 检查项目中已有的 AAR（试点）
+
+只读检查所给项目根目录下的直接文件 `app/libs/*.aar` 和
+`uni_modules/*/utssdk/app-android/libs/*.aar`：
+
+```sh
+python skills/android-project-check/scripts/check_project.py "/path/to/project" --output-dir "/path/to/new-evidence"
+```
+
+JSON 包含稳定的相对来源路径、AAR/SO SHA-256、Manifest 存在情况、ABI
+及 64 位 ELF `PT_LOAD` 对齐结果。可选输出目录必须尚不存在且位于项目外，
+保存 `report.json` 和中英文 `report.md`。已有内容不会被覆盖；命令不运行构建、
+不修改项目，也不搜索依赖缓存。
+
+默认不要求任何 ABI。可重复使用 `--expect-abi arm64-v8a` 等参数，要求
+**每个** AAR 都包含指定 ABI，纯 Java AAR 也适用。退出码：`0` 通过、`1`
+检查失败、`2` 输入或输出无效、`3` `no_matches`（未找到 AAR，不代表通过）；
+混合结果中输入无效优先。`elf64_count: 0` 明确表示未检查任何 64 位 ELF 对齐。
+Manifest 只检查存在且可读取；AAR ZIP 布局不能证明 APK ZIP 对齐或设备/JNI
+运行行为。[目录检查说明](skills/android-project-check) 列出归档、原生库、路径
+和输出边界。
+
 ## 其他交付工具
 
 | 场景 | 用法 |

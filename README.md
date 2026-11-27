@@ -82,6 +82,30 @@ directory to use it as a Skill. See the
 [Android AAR documentation](https://developer.android.com/studio/projects/android-library#aar-contents)
 for the archive layout.
 
+## Inspect AARs already present in a project (pilot)
+
+Run a read-only check of direct `app/libs/*.aar` and
+`uni_modules/*/utssdk/app-android/libs/*.aar` files in a supplied project root:
+
+```sh
+python skills/android-project-check/scripts/check_project.py "/path/to/project" --output-dir "/path/to/new-evidence"
+```
+
+JSON lists stable relative source paths, AAR/SO SHA-256, manifest presence,
+discovered ABIs and 64-bit ELF `PT_LOAD` alignment. Optional output is a new
+directory outside the project containing `report.json` and an English/Chinese
+`report.md`. Existing paths are preserved. This command does not build, modify
+the project or search dependency caches.
+
+No ABI is required by default. Repeat `--expect-abi arm64-v8a` (or another ABI)
+to require it in **every** AAR, including Java-only AARs. Exit codes are `0`
+pass, `1` failed check, `2` invalid input/output and `3` `no_matches` (not a
+pass); invalid input takes precedence in mixed results. `elf64_count: 0`
+explicitly means no 64-bit ELF alignment was evaluated. Manifest checks cover
+presence/readability only; AAR ZIP layout does not establish APK ZIP alignment
+or device/JNI behavior. See the [project check guide](skills/android-project-check)
+for archive, native-entry, path and output boundaries.
+
 ## JNI load diagnosis
 
 Give the checker the final APK, the app's selected ABI, and a log from the

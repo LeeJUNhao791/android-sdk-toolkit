@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add a bounded Android/UTS project AAR inspection pilot with relative paths, SHA-256, opt-in ABI expectations, ELF LOAD alignment, explicit no-match results and optional bilingual supplier drafts. Inputs remain read-only; no Gradle or cache scan is performed.
+
 ## [0.11.0] - 2026-11-27
 
 - Extend the same-build native provenance Gradle exporter to select an Android application module and exact Debug/Release or product-flavor variant. Keep the default `:app` Debug command and JSON schemas compatible; isolate other variants' reports and reject multiple APK outputs. [#16](https://github.com/LeeJUNhao791/android-sdk-toolkit/pull/16)
