@@ -69,3 +69,36 @@ before sharing.
 
 Run `python -B -m unittest discover -s skills/android-project-check/tests -v`
 from the Toolkit repository root.
+
+## Optional source advisory hints (next source revision)
+
+This source prototype is newer than the published v0.12.0 archive. That archive
+contains the baseline AAR scanner but does not support `--source-file`.
+
+Add `--source-file app/src/main/cpp/pages.cpp` for each explicitly selected
+project-relative C/C++ source/header (.c/.cc/.cpp/.cxx/.h/.hpp). Use POSIX `/`
+separators on every OS. No recursive source search is performed. At most 100
+requests, 1 MiB per file and 2000 total hints are accepted. Paths must be regular
+files within the resolved project; absolute/drive/backslash/parent paths and
+symlinks/reparse points below the root are rejected. Source text must be UTF-8.
+Limit errors return `invalid`; any collected AAR results remain present.
+
+Only with this option, JSON adds `source_advisories` containing `status`
+(`hints`, `no_hints`, `invalid`), `files` (relative `source`, complete byte
+`sha256`), `hints` (`source`, one-based `line`, `rule`) and `errors`.
+`page_size_definition` identifies explicit PAGE_SIZE/PAGESIZE definitions or
+const declarations equal to 4096/0x1000. `page_alignment_literal` identifies
+literal division/modulo by 4096 or masking by ~4095 in a same-line statement
+with a page/alignment identifier. Ordinary buffers, unrelated 4096 values,
+comments and ordinary quoted strings are ignored. No source text is returned.
+
+These are narrow lexical heuristics, not a C/C++ parser: aliases, multiline
+expressions, raw strings, macro expansion and program semantics may be missed
+or misinterpreted. `no_hints` does not prove safe source. Hints never change the
+AAR pass/fail/no_matches result; invalid source input makes the overall result
+invalid. Without this option the existing JSON schema is unchanged.
+
+A hint is advisory evidence for human review, not proof of a defect or 16 KB
+runtime compatibility. No patch is generated or applied: correct replacements
+require source ownership and program context. Closed AARs require supplier
+remediation using the artifact/native hashes; this command cannot repair them.

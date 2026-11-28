@@ -493,3 +493,10 @@ python -B -m unittest discover -s tests -v
 ## License
 
 [Contributing](CONTRIBUTING.md) · [MIT](LICENSE)
+
+Source prototype after v0.12.0: the published v0.12.0 archive does not include
+`--source-file`. Optional source review: repeat `--source-file app/src/main/cpp/pages.cpp` to
+include bounded, project-relative C/C++ page-size advisory hints and source
+SHA-256. These lexical hints do not change AAR pass/fail/no_matches and do not
+prove a defect, safe source or runtime compatibility. No patches are generated.
+See the [source advisory contract](skills/android-project-check/SKILL.md#optional-source-advisory-hints-next-source-revision).
