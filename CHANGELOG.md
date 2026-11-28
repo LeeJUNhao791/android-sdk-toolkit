@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Link the bilingual paired PageGuard source preview with pinned MCP setup and source/hash manifests; scanner and source advisory behavior is unchanged.
+
 ## [0.12.0] - 2026-11-27
 
 - Add a bounded Android/UTS project AAR inspection with relative paths, SHA-256, opt-in ABI expectations, ELF LOAD alignment, explicit no-match results and optional bilingual supplier drafts. Inputs remain read-only; no Gradle or cache scan is performed. [#18](https://github.com/LeeJUNhao791/android-sdk-toolkit/pull/18)
