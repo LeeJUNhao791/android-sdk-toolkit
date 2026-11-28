@@ -154,3 +154,8 @@ Manifest 只检查存在且可读取；AAR ZIP 布局不能证明 APK ZIP 对齐
 ## 许可证
 
 [贡献指南](CONTRIBUTING.md) · [MIT](LICENSE)
+
+可选源码复核：重复指定 `--source-file app/src/main/cpp/pages.cpp`，可添加有限范围的
+项目内 C/C++ 页大小提示及源码 SHA-256。词法提示不改变 AAR 的通过、失败或无匹配结果，
+也不证明缺陷、源码安全或运行兼容性；不生成补丁。范围和限制见
+[源码提示约定](skills/android-project-check/SKILL.md#optional-source-advisory-hints-next-source-revision)。

@@ -190,6 +190,16 @@ def render_summary(report):
               "For invalid input, resolve the reported input error before interpreting alignment.", "",
               "失败时请供应商核对上述 AAR/SO 摘要、ABI 和 PT_LOAD 数值；"
               "输入无效时先处理输入错误，再解读对齐结果。", ""]
+    if "source_advisories" in report:
+        advisory = report["source_advisories"]
+        lines += ["## Source advisory hints / 源码人工复核提示", "",
+                  "Status: " + advisory["status"], "",
+                  "Heuristic hints are advisory, not proof of a defect, safe source or 16 KB runtime compatibility. "
+                  "No patches are generated. / 启发式提示需人工复核，不证明缺陷、源码安全或 16 KB 运行兼容性；不生成补丁。", ""]
+        lines += ["- " + item["source"] + ": SHA-256 " + item["sha256"] for item in advisory["files"]]
+        lines += ["- " + hint["source"] + ":" + str(hint["line"]) + " " + hint["rule"] for hint in advisory["hints"]]
+        lines += ["- " + error["source"] + ": " + error["error"] for error in advisory["errors"]]
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -198,6 +208,8 @@ def main():
     parser.add_argument("project_root", type=Path)
     parser.add_argument("--expect-abi", action="append", default=[], choices=sorted(AAR["ELF_ABIS"]),
                         help="Require this ABI in EVERY AAR (including Java-only); repeatable, no default.")
+    parser.add_argument("--source-file", action="append", default=[],
+                        help="Optional project-relative C/C++ file for advisory page-size hints; repeatable, max 100.")
     parser.add_argument("--output-dir", type=Path, help="New directory OUTSIDE project for JSON and bilingual Markdown.")
     args = parser.parse_args()
     try:
@@ -214,6 +226,11 @@ def main():
         print("Project check output directory error: " + str(error), file=sys.stderr)
         return 2
     report = scan(root, sorted(set(args.expect_abi)))
+    if args.source_file:
+        sources = runpy.run_path(str(Path(__file__).with_name("source_hints.py")))
+        report["source_advisories"] = sources["scan_sources"](root, args.source_file)
+        if report["source_advisories"]["status"] == "invalid":
+            report["status"] = "invalid"
     content = json.dumps(report, indent=2, sort_keys=True) + "\n"
     print(content, end="")
     if args.output_dir is not None:
