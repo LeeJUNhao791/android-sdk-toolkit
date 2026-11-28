@@ -72,6 +72,9 @@ from the Toolkit repository root.
 
 ## Optional source advisory hints (next source revision)
 
+This source prototype is newer than the published v0.12.0 archive. That archive
+contains the baseline AAR scanner but does not support `--source-file`.
+
 Add `--source-file app/src/main/cpp/pages.cpp` for each explicitly selected
 project-relative C/C++ source/header (.c/.cc/.cpp/.cxx/.h/.hpp). Use POSIX `/`
 separators on every OS. No recursive source search is performed. At most 100
