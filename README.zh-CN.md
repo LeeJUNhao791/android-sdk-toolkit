@@ -1,5 +1,10 @@
 # Android SDK Toolkit
 
+与 Android MCP Inspector 配套的源码预览包、固定 MCP 依赖及无需 Android SDK 的
+中英文准备方法见 [PageGuard 便携源码预览包](https://github.com/LeeJUNhao791/android-mcp-inspector/blob/main/docs/portable-preview.zh-CN.md)。
+ZIP 记录两个仓库的精确提交和逐文件 SHA-256，与正式发布分开。请保留受信任的
+Toolkit 目录及其同级 Skills。静态 AAR/源码结果不证明最终 APK 打包或 16 KB 设备运行行为。
+
 [English](README.md)
 
 [![main 分支 SDK Toolkit CI](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LeeJUNhao791/android-sdk-toolkit/actions/workflows/ci.yml)

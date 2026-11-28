@@ -500,3 +500,11 @@ include bounded, project-relative C/C++ page-size advisory hints and source
 SHA-256. These lexical hints do not change AAR pass/fail/no_matches and do not
 prove a defect, safe source or runtime compatibility. No patches are generated.
 See the [source advisory contract](skills/android-project-check/SKILL.md#optional-source-advisory-hints-next-source-revision).
+
+For a paired source preview with Android MCP Inspector, exact MCP dependency
+pins and bilingual setup without an Android SDK, see the
+[PageGuard portable source preview](https://github.com/LeeJUNhao791/android-mcp-inspector/blob/main/docs/portable-preview.md).
+The ZIP records both source commits and per-file SHA-256; it is separate from
+published Toolkit releases. Keep the trusted Toolkit directory and its sibling
+Skills together. Static AAR/source results do not establish final APK packaging
+or runtime behavior on a 16 KB Android device.
